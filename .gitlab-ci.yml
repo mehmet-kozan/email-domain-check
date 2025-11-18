@@ -1,0 +1,82 @@
+image: node:8.9.1
+
+stages:
+  - install
+  - test
+  - version
+  - publish
+  - package
+
+before_script:
+  - git config --global user.email $GITLAB_USER_EMAIL
+  - git config --global user.name $GITLAB_USER_LOGIN
+
+after_script:
+  - echo "end of script"
+
+package_install:
+  stage: install
+  script:
+    - pwd
+    - npm install --save --save-dev --save-exact
+
+mocha_test:
+  stage: test
+  script:
+    - pwd
+    - npm install --save --save-dev --save-exact
+    - npm run test
+
+version_check:
+  stage: version
+  only:
+    - master
+  script:
+    - pwd
+    - npm install --save --save-dev --save-exact
+    - npm run test
+    - REPO_VERSION=$(npm view $CI_PROJECT_NAME version)
+    - CURRENT_VERSION=$(node -p "require('./package.json').version")
+    - |
+      if [ "${REPO_VERSION}" != "${CURRENT_VERSION}" ]; then
+        echo "repo version not equal to current version"
+        echo REPO_VERSION=${REPO_VERSION}
+        echo CURRENT_VERSION=${CURRENT_VERSION}
+        git tag v${CURRENT_VERSION} master
+        git push ${CI_REPOSITORY_URL//$CI_REGISTRY_PASSWORD/$CI_ACCESS_TOKEN} v${CURRENT_VERSION} -q &>/dev/null
+      fi   
+
+npm_publish:
+  stage: publish
+  only:
+    - tags
+  script:
+    - pwd
+    - echo //registry.npmjs.org/:_authToken=${NPM_TOKEN} > ~/.npmrc
+    - npm publish
+
+package_test:
+  stage: package
+  only:
+    - tags
+  script:
+    - pwd
+    - cd ..
+    - rm -rf npm_package_install
+    - mkdir npm_package_install
+    - cd npm_package_install
+    - npm install --prefix ./ ${CI_PROJECT_NAME}
+    - cd node_modules
+    - cd ${CI_PROJECT_NAME}
+    - REPO_VERSION=$(npm view ${CI_PROJECT_NAME} version)
+    - CURRENT_VERSION=$(node -p "require('./package.json').version")
+    - |
+      if [ "${REPO_VERSION}" == "${CURRENT_VERSION}" ]; then
+        echo "repo version equal to current version"
+        echo REPO_VERSION=${REPO_VERSION}
+        echo CURRENT_VERSION=${CURRENT_VERSION}
+        npm install --save --save-dev --save-exact
+        npm run test
+      else
+        exit 1
+      fi
