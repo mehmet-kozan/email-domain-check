@@ -1,8 +1,9 @@
 {
   "name": "email-domain-check",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Checks existence of E-Mail DNS MX records.",
-  "main": "email-domain-check.js",
+  "main": "src/email-domain-check.js",
+  "type": "commonjs",
   "keywords": [
     "email",
     "existence",
@@ -28,29 +29,26 @@
     "email-full-validate"
   ],
   "dependencies": {
-    "dnscache": "^1.0.1",
-    "co": "^4.6.0"
   },
   "devDependencies": {
-    "mocha": "^4.0.1",
-    "path": "^0.12.7"
+    "mocha": "^11.7.5"
   },
   "scripts": {
     "test": "mocha --recursive",
     "start": "node email-domain-check.js"
   },
-  "homepage": "https://gitlab.com/autokent/email-domain-check",
+  "homepage": "https://github.com/mehmet-kozan/email-domain-check",
   "bugs": {
-    "url": "https://gitlab.com/autokent/email-domain-check/issues",
-    "email": "mehmet.kozan@live.com"
+    "url": "https://github.com/mehmet-kozan/email-domain-check/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://gitlab.com/autokent/email-domain-check.git"
+    "url": "git+https://github.com/mehmet-kozan/email-domain-check.git"
   },
-  "author": "Mehmet Kozan <mehmet.kozan@live.com>",
+  "files": ["src"],
+  "author": "Mehmet Kozan",
   "license": "MIT",
   "engines": {
-    "node": ">=6.8.1"
+    "node": ">=18"
   }
 }
