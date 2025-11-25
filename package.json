@@ -1,6 +1,6 @@
 {
 	"name": "email-domain-check",
-	"version": "2.0.1",
+	"version": "2.0.2",
 	"description": "Checks existence of E-Mail DNS MX records.",
 	"type": "module",
 	"main": "dist/cjs/index.js",
@@ -8,9 +8,9 @@
 	"types": "dist/types/index.d.ts",
 	"exports": {
 		".": {
+			"types": "./dist/types/index.d.ts",
 			"import": "./dist/esm/index.js",
-			"require": "./dist/cjs/index.js",
-			"types": "./dist/types/index.d.ts"
+			"require": "./dist/cjs/index.js"
 		},
 		"./package.json": "./package.json"
 	},
