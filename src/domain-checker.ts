@@ -1,7 +1,6 @@
-import { NODATA, NOTFOUND, SERVFAIL } from "node:dns";
 import { Resolver } from "node:dns/promises";
 import { Address, type Target } from "./address.js";
-import type { DomainCheckerOptions, MxRecord } from "./types.js";
+import { DNS_ERRORS, type DomainCheckerOptions, type MxRecord } from "./types.js";
 
 export class DomainChecker {
 	private options: DomainCheckerOptions;
@@ -15,7 +14,10 @@ export class DomainChecker {
 			dnsTimeout: -1,
 			useTargetNameServer: false,
 			tries: 4,
-			failoverServers: [["1.1.1.1", "1.0.0.1"], ["8.8.8.8", "8.8.4.4"], ["9.9.9.9"]],
+			failoverServers: [
+				["1.1.1.1", "1.0.0.1"],
+				["8.8.8.8", "8.8.4.4"],
+			],
 		};
 
 		this.options = { ...defaultOptions, ...(options ?? {}) };
@@ -131,7 +133,7 @@ export class DomainChecker {
 			if (error instanceof Error && "code" in error) {
 				// TODO SERVFAIL ise fallback dns kullan
 				// || error.code === SERVFAIL
-				if (error.code === NODATA || error.code === NOTFOUND) {
+				if (error.code === DNS_ERRORS.NODATA || error.code === DNS_ERRORS.NOTFOUND) {
 					return [];
 				}
 
