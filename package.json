@@ -1,6 +1,6 @@
 {
 	"name": "email-domain-check",
-	"version": "2.0.2",
+	"version": "2.0.3",
 	"description": "Checks existence of E-Mail DNS MX records.",
 	"type": "module",
 	"main": "dist/cjs/index.js",

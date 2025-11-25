@@ -1,1 +1,3 @@
-export * from "./email-domain-check.js";
+export * from "./address.js";
+export * from "./domain-checker.js";
+export type * from "./types.js";

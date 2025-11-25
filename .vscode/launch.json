@@ -24,7 +24,13 @@
 			"type": "node",
 			"request": "launch",
 			"program": "${workspaceRoot}/node_modules/vitest/vitest.mjs",
-			"args": ["run", "${relativeFile}", "--test-timeout=9999999", "--reporter=default"],
+			"args": [
+				"run",
+				"${relativeFile}",
+				"--test-timeout=0",
+				"--no-file-parallelism",
+				"--reporter=default"
+			],
 			"runtimeArgs": [],
 			"cwd": "${workspaceFolder}",
 			"autoAttachChildProcesses": true,
@@ -39,7 +45,7 @@
 			"type": "node",
 			"request": "launch",
 			"program": "${workspaceRoot}/node_modules/vitest/vitest.mjs",
-			"args": ["run", "--test-timeout=9999999", "--reporter=default"],
+			"args": ["run", "--no-file-parallelism", "--test-timeout=0", "--reporter=default"],
 			"runtimeArgs": [],
 			"cwd": "${workspaceFolder}",
 			"autoAttachChildProcesses": true,
