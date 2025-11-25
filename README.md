@@ -12,20 +12,14 @@
 
 ## Usage
 ```js
-const edc = require('email-domain-check');
+const {mxCheck} = require('email-domain-check');
 
-edc("tom@hotmail.com").then(function(result){
+mxCheck("tom@hotmail.com").then(function(result){
     console.log(result);//true
 })
 
-edc("tom@hotmaililililcom").then(function(result){
+mxCheck("tom@hotmaililililcom").then(function(result){
     console.log(result);//false
 })
 
 ```
-
-
-## Test
-`mocha` or `npm test`
-
-> check test folder and QUICKSTART.js for extra usage.

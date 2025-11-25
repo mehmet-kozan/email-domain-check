@@ -1,54 +1,77 @@
 {
-  "name": "email-domain-check",
-  "version": "1.1.5",
-  "description": "Checks existence of E-Mail DNS MX records.",
-  "main": "src/email-domain-check.js",
-  "type": "commonjs",
-  "keywords": [
-    "email",
-    "existence",
-    "validation",
-    "validator",
-    "domain",
-    "mx",
-    "mail-exchange",
-    "mail",
-    "smtp",
-    "verify",
-    "validate",
-    "validate-email-hostname",
-    "mailcheck",
-    "email-checker",
-    "is-open-mail",
-    "validate-email-hostname",
-    "email-deep-validator",
-    "enhanced-email-deep-validator",
-    "mail-confirm",
-    "legit",
-    "email-mx-validator",
-    "email-full-validate"
-  ],
-  "dependencies": {
-  },
-  "devDependencies": {
-    "mocha": "^11.7.5"
-  },
-  "scripts": {
-    "test": "mocha --recursive",
-    "start": "node email-domain-check.js"
-  },
-  "homepage": "https://github.com/mehmet-kozan/email-domain-check",
-  "bugs": {
-    "url": "https://github.com/mehmet-kozan/email-domain-check/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/mehmet-kozan/email-domain-check.git"
-  },
-  "files": ["src"],
-  "author": "Mehmet Kozan",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18"
-  }
+	"name": "email-domain-check",
+	"version": "2.0.0",
+	"description": "Checks existence of E-Mail DNS MX records.",
+	"type": "module",
+	"main": "dist/cjs/index.js",
+	"module": "dist/esm/index.js",
+	"types": "dist/types/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/esm/index.js",
+			"require": "./dist/cjs/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"keywords": [
+		"email",
+		"existence",
+		"validation",
+		"validator",
+		"domain",
+		"mx",
+		"mail-exchange",
+		"mail",
+		"smtp",
+		"verify",
+		"validate",
+		"validate-email-hostname",
+		"mailcheck",
+		"email-checker",
+		"is-open-mail",
+		"validate-email-hostname",
+		"email-deep-validator",
+		"enhanced-email-deep-validator",
+		"mail-confirm",
+		"legit",
+		"email-mx-validator",
+		"email-full-validate"
+	],
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.7",
+		"@types/node": "^20.6.2",
+		"@vitest/ui": "^4.0.13",
+		"cpy-cli": "^6.0.0",
+		"rimraf": "^5.0.1",
+		"typescript": "^5.4.2",
+		"vitest": "^4.0.13"
+	},
+	"scripts": {
+		"test": "vitest run",
+		"build:esm": "tsc -p tsconfig.esm.json",
+		"build:cjs": "tsc -p tsconfig.cjs.json",
+		"build": "npm run clean && npm run build:esm && npm run build:cjs",
+		"postbuild": "cpy  ./package.cjs.json ./dist/cjs/ --rename=package.json",
+		"clean": "rimraf dist",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"format:all": "biome check --write .",
+		"format:check": "biome check ."
+	},
+	"homepage": "https://github.com/mehmet-kozan/email-domain-check",
+	"bugs": {
+		"url": "https://github.com/mehmet-kozan/email-domain-check/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/mehmet-kozan/email-domain-check.git"
+	},
+	"files": [
+		"dist"
+	],
+	"author": "Mehmet Kozan",
+	"license": "MIT",
+	"engines": {
+		"node": ">=18"
+	}
 }
