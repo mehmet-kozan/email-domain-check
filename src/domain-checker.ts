@@ -6,27 +6,28 @@ import type { DomainCheckerOptions, MxRecord } from "./types.js";
 export class DomainChecker {
 	private options: DomainCheckerOptions;
 	private resolver: Resolver;
-	private nsResolver?: Resolver;
 
 	constructor(options?: DomainCheckerOptions) {
 		const defaultOptions: DomainCheckerOptions = {
 			dkimSelector: "mx",
 			smtpConnectionTimeout: 5000,
-			dnsConnectionTimeout: 5000,
+			dnsConnectionTimeout: -1,
 			useDomainNameServers: true,
+			tries: 4,
 		};
 
 		this.options = { ...defaultOptions, ...(options ?? {}) };
 
-		this.resolver = new Resolver({});
+		this.resolver = new Resolver({
+			timeout: this.options.dnsConnectionTimeout,
+			tries: this.options.tries,
+		});
 		if (this.options.customDnsServers) {
 			this.resolver.setServers(this.options.customDnsServers);
 		}
 	}
 
 	private async getNsResolver(hostname: string): Promise<Resolver> {
-		if (this.nsResolver) return this.nsResolver;
-
 		try {
 			const nsHosts = await this.resolver.resolveNs(hostname); // ["ns1.example.net", ...]
 			const ips: string[] = [];
@@ -46,17 +47,17 @@ export class DomainChecker {
 				}
 			}
 
-			const resolver = new Resolver();
+			const resolver = new Resolver({
+				timeout: this.options.dnsConnectionTimeout,
+				tries: this.options.tries,
+			});
 			if (ips.length > 0) {
 				resolver.setServers(ips);
 			} // else leave resolver with system servers as fallback
-
-			this.nsResolver = resolver;
-			return this.nsResolver;
+			return resolver;
 		} catch {
 			// fallback: sistem resolver
-			this.nsResolver = this.resolver;
-			return this.nsResolver;
+			return this.resolver;
 		}
 	}
 

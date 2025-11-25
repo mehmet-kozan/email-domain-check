@@ -8,4 +8,5 @@ export interface DomainCheckerOptions {
 	dnsConnectionTimeout?: number;
 	useDomainNameServers?: boolean;
 	ignoreIPv6?: boolean;
+	tries: number;
 }
