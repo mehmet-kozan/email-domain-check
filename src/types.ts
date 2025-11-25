@@ -1,12 +1,13 @@
 export type { MxRecord } from "node:dns";
 
 export interface DomainCheckerOptions {
-	customDnsServers?: string[];
+	server?: string[];
 	dkimSelector?: string;
 	useCache?: boolean;
-	smtpConnectionTimeout?: number;
-	dnsConnectionTimeout?: number;
-	useDomainNameServers?: boolean;
+	smtpTimeout?: number;
+	dnsTimeout?: number;
+	useTargetNameServer?: boolean;
 	ignoreIPv6?: boolean;
 	tries: number;
+	failoverServers: Array<string[]>;
 }

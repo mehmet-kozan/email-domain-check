@@ -6,24 +6,50 @@ import type { DomainCheckerOptions, MxRecord } from "./types.js";
 export class DomainChecker {
 	private options: DomainCheckerOptions;
 	private resolver: Resolver;
+	private failoverResolvers: Resolver[] = [];
 
 	constructor(options?: DomainCheckerOptions) {
 		const defaultOptions: DomainCheckerOptions = {
 			dkimSelector: "mx",
-			smtpConnectionTimeout: 5000,
-			dnsConnectionTimeout: -1,
-			useDomainNameServers: true,
+			smtpTimeout: 5000,
+			dnsTimeout: -1,
+			useTargetNameServer: false,
 			tries: 4,
+			failoverServers: [["1.1.1.1", "1.0.0.1"], ["8.8.8.8", "8.8.4.4"], ["9.9.9.9"]],
 		};
 
 		this.options = { ...defaultOptions, ...(options ?? {}) };
 
 		this.resolver = new Resolver({
-			timeout: this.options.dnsConnectionTimeout,
+			timeout: this.options.dnsTimeout,
 			tries: this.options.tries,
 		});
-		if (this.options.customDnsServers) {
-			this.resolver.setServers(this.options.customDnsServers);
+		if (this.options.server) {
+			this.resolver.setServers(this.options.server);
+		}
+
+		for (const server of this.options.failoverServers) {
+			const resolver = new Resolver({
+				timeout: this.options.dnsTimeout,
+				tries: this.options.tries,
+			});
+
+			if (this.options.server) {
+				if (server.includes(this.options.server[0])) {
+					continue;
+				}
+			}
+
+			resolver.setServers(server);
+			this.failoverResolvers.push(resolver);
+		}
+
+		if (this.options.server) {
+			const defaultResolver = new Resolver({
+				timeout: this.options.dnsTimeout,
+				tries: this.options.tries,
+			});
+			this.failoverResolvers.push(defaultResolver);
 		}
 	}
 
@@ -48,7 +74,7 @@ export class DomainChecker {
 			}
 
 			const resolver = new Resolver({
-				timeout: this.options.dnsConnectionTimeout,
+				timeout: this.options.dnsTimeout,
 				tries: this.options.tries,
 			});
 			if (ips.length > 0) {
@@ -72,24 +98,47 @@ export class DomainChecker {
 		}
 	}
 
-	public async getMxRecord(target: Target, fallback?: Resolver): Promise<MxRecord[]> {
+	public async getMxRecord(target: Target): Promise<MxRecord[]> {
 		const addr = Address.loadFromTarget(target);
 
+		let lastError: Error;
+		try {
+			return await this.getMxRecordWithFallback(addr);
+		} catch (error) {
+			lastError = error as Error;
+		}
+
+		for (const resolver of this.failoverResolvers) {
+			try {
+				return await this.getMxRecordWithFallback(addr, resolver);
+			} catch (error) {
+				lastError = error as Error;
+			}
+		}
+
+		throw lastError;
+	}
+
+	private async getMxRecordWithFallback(target: Address, fallback?: Resolver): Promise<MxRecord[]> {
 		try {
 			let resolver = fallback ? fallback : this.resolver;
-			if (this.options.useDomainNameServers && !fallback) {
-				resolver = await this.getNsResolver(addr.hostname);
+			if (this.options.useTargetNameServer && !fallback) {
+				resolver = await this.getNsResolver(target.hostname);
 			}
-			const result = await resolver.resolveMx(addr.hostname);
+			const result = await resolver.resolveMx(target.hostname);
 			return result;
 		} catch (error) {
 			if (error instanceof Error && "code" in error) {
 				// TODO SERVFAIL ise fallback dns kullan
-				if (error.code === NODATA || error.code === NOTFOUND || error.code === SERVFAIL) {
+				// || error.code === SERVFAIL
+				if (error.code === NODATA || error.code === NOTFOUND) {
 					return [];
 				}
+
+				throw error;
 			}
-			throw error;
+
+			throw new Error(String(error));
 		}
 	}
 
