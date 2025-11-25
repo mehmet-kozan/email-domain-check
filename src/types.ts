@@ -10,8 +10,9 @@ export interface DomainCheckerOptions {
 	dnsTimeout?: number;
 	useTargetNameServer?: boolean;
 	ignoreIPv6?: boolean;
-	tries: number;
-	failoverServers: Array<string[]>;
+	tries?: number;
+	failoverServers?: Array<string[]>;
+	blockReservedIPs?: boolean;
 }
 
 export const DNS_ERRORS = {

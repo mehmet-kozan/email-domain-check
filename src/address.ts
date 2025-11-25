@@ -1,5 +1,6 @@
 import net from "node:net";
 import { domainToASCII } from "node:url";
+import ipaddr from "ipaddr.js";
 
 export type Target = string | URL | Address;
 
@@ -86,6 +87,29 @@ export class Address {
 		if (this.hostname) {
 			return this.hostname.split(".").some((part) => part.startsWith("xn--"));
 		}
+		return false;
+	}
+
+	// Special IPv4 address ranges.
+	// See also https://en.wikipedia.org/wiki/Reserved_IP_addresses
+	public get isReserved(): boolean {
+		if (!this.isIP) return false;
+
+		try {
+			const parsed = ipaddr.parse(this.hostname);
+			const range = parsed.range(); // e.g. 'unicast','private','loopback','linkLocal','multicast','uniqueLocal','global', ...
+			// IPv4: consider as reserved if not 'unicast'
+			if (this.ipKind === IPKind.IPv4) {
+				return range !== "unicast";
+			}
+			// IPv6: consider as reserved if not 'unicast'
+			if (this.ipKind === IPKind.IPv6) {
+				return range !== "unicast";
+			}
+		} catch {
+			// If parsing fails, assume it's not reserved
+		}
+
 		return false;
 	}
 }

@@ -18,6 +18,7 @@ export class DomainChecker {
 				["1.1.1.1", "1.0.0.1"],
 				["8.8.8.8", "8.8.4.4"],
 			],
+			blockReservedIPs: true,
 		};
 
 		this.options = { ...defaultOptions, ...(options ?? {}) };
@@ -30,7 +31,7 @@ export class DomainChecker {
 			this.resolver.setServers(this.options.server);
 		}
 
-		for (const server of this.options.failoverServers) {
+		for (const server of this.options.failoverServers ?? []) {
 			const resolver = new Resolver({
 				timeout: this.options.dnsTimeout,
 				tries: this.options.tries,
