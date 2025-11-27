@@ -60,7 +60,7 @@ jobs:
         run: npm i
 
       - name: Run All Tests
-        run: npm run test:all
+        run: npm run test
 
       - name: Set publish tag
         id: publish_tag
