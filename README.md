@@ -12,6 +12,10 @@
 [![version](https://img.shields.io/npm/v/email-domain-check.svg)](https://www.npmjs.org/package/email-domain-check)
 [![downloads](https://img.shields.io/npm/dt/email-domain-check.svg)](https://www.npmjs.org/package/email-domain-check)
 [![node](https://img.shields.io/node/v/email-domain-check.svg)](https://nodejs.org/)  
+[![tests](https://github.com/mehmet-kozan/email-domain-check/actions/workflows/test.yml/badge.svg)](https://github.com/mehmet-kozan/email-domain-check/actions/workflows/test.yml) 
+[![tests](https://github.com/mehmet-kozan/email-domain-check/actions/workflows/test_integration.yml/badge.svg)](https://github.com/mehmet-kozan/email-domain-check/actions/workflows/test_integration.yml)
+[![biome](https://img.shields.io/badge/code_style-biome-60a5fa?logo=biome)](https://biomejs.dev) 
+[![vitest](https://img.shields.io/badge/tested_with-vitest-6E9F18?logo=vitest)](https://vitest.dev) 
 
 </div>
 
@@ -253,18 +257,18 @@ interface DomainCheckerOptions {
 
 #### Methods
 
-- `hasMxRecord(target: Target): Promise<boolean>` - Check if domain has MX records
-- `getMxRecord(options: ResolveOptions): Promise<MxRecord[]>` - Get MX records
-- `getSmtpConnection(target: Target): Promise<Socket | null>` - Test SMTP connection
-- `getTxtRecord(options: ResolveOptions): Promise<TXTResult | null>` - Get all TXT records parsed
-- `getSpfRecord(options: ResolveOptions): Promise<SPF1Record | null>` - Get SPF record
-- `getDkimRecord(options: ResolveOptions): Promise<DKIM1Record | null>` - Get DKIM record
-- `getDmarcRecord(options: ResolveOptions): Promise<DMARC1Record | null>` - Get DMARC record
-- `getStsRecord(options: ResolveOptions): Promise<STSv1Record | null>` - Get MTA-STS record
-- `getCustomRecords(options: ResolveOptions): Promise<CustomRecord[] | null>` - Get custom TXT records
-- `getCustomKVRecord(options: ResolveOptions, key: string): Promise<CustomKVRecord | null>` - Get specific key-value record
-- `getAllKVRecords(options: ResolveOptions): Promise<CustomKVRecord[] | null>` - Get all key-value records
-- `getNameServers(target: Target): Promise<string[]>` - Get authoritative name servers
+- `hasMxRecord(target: Target)` - Check if domain has MX records
+- `getMxRecord(options: ResolveOptions)` - Get MX records
+- `getSmtpConnection(target: Target)` - Test SMTP connection
+- `getTxtRecord(options: ResolveOptions)` - Get all TXT records parsed
+- `getSpfRecord(options: ResolveOptions)` - Get SPF record
+- `getDkimRecord(options: ResolveOptions)` - Get DKIM record
+- `getDmarcRecord(options: ResolveOptions)` - Get DMARC record
+- `getStsRecord(options: ResolveOptions)` - Get MTA-STS record
+- `getCustomRecords(options: ResolveOptions)` - Get custom TXT records
+- `getCustomKVRecord(options: ResolveOptions, key: string)` - Get specific key-value record
+- `getAllKVRecords(options: ResolveOptions)` - Get all key-value records
+- `getNameServers(target: Target)` - Get authoritative name servers
 
 ### Address Class
 

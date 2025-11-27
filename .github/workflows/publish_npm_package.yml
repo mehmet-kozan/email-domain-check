@@ -1,0 +1,76 @@
+name: Publish NPM Package
+
+concurrency: publish
+
+on:
+  release:
+    types: [published] # Trigger when a release is published
+
+permissions:
+  id-token: write # Grants write access to id-token for provenance
+  contents: read # Ensures the workflow can read repository contents
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: publish
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Extract tag version
+        id: tag_version
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
+            TAG_VERSION=$(node -p "require(process.env.GITHUB_EVENT_PATH).release.tag_name")
+          fi
+          TAG_VERSION=${TAG_VERSION#v}
+          echo "version=$TAG_VERSION" >> $GITHUB_OUTPUT
+          echo "Tag version: $TAG_VERSION"
+
+      - name: Get package.json version
+        id: package_version
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+          echo "Package.json version: $PACKAGE_VERSION"
+
+      - name: Compare versions
+        run: |
+          if [ "${{ steps.tag_version.outputs.version }}" != "${{ steps.package_version.outputs.version }}" ]; then
+            echo "Error: Tag version (${{ steps.tag_version.outputs.version }}) does not match package.json version (${{ steps.package_version.outputs.version }})"
+            exit 1
+          fi
+          echo "Version match confirmed: ${{ steps.tag_version.outputs.version }}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.20.0"
+          package-manager-cache: false
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Clean NPM Cache
+        run: npm cache clean --force
+
+      - name: Install
+        run: npm i
+
+      - name: Run All Tests
+        run: npm run test:all
+
+      - name: Set publish tag
+        id: publish_tag
+        run: |
+          if [[ "${{ steps.tag_version.outputs.version }}" == *"beta"* ]]; then
+            echo "tag=beta" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - run: npm publish --provenance --access public --tag ${{ steps.publish_tag.outputs.tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

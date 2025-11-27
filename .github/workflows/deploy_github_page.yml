@@ -1,0 +1,79 @@
+name: Deploy GitHub Page
+
+on:
+  release:
+    types: [published] # Trigger when a release is published
+  workflow_dispatch: {}
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write # to deploy to Pages
+  id-token: write # to verify the deployment originates from an appropriate source
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Do not set the `environment` here; protected environments tied to `main` can block
+    # GitHub Actions from completing deployments. Instead, build the site and deploy the
+    # artifact to Pages. The workflow still runs on `main` pushes but won't require
+    # the `github-pages` environment approval.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.20.0"
+          package-manager-cache: false
+
+      - name: Clean NPM Cache
+        run: npm cache clean --force
+
+      - name: Install
+        run: npm i
+
+      - name: Run All Tests
+        run: npm run test:all
+
+      - name: Site Build
+        run: npm run report:build
+
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./reports/coverage
+          fail_ci_if_error: false
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static files
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: reports/
+          name: reports-and-live-demo
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: reports-and-live-demo
