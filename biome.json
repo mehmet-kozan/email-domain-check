@@ -10,6 +10,13 @@
 		"includes": ["**", "!dist", "!node_modules"]
 	},
 	"formatter": {
-		"lineWidth": 100
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 180
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "single"
+		}
 	}
 }

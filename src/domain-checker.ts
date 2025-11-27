@@ -1,64 +1,85 @@
-import { Resolver } from "node:dns/promises";
-import { Address, type Target } from "./address.js";
-import { DNS_ERRORS, type DomainCheckerOptions, type MxRecord } from "./types.js";
+import type { MxRecord } from 'node:dns';
+import { createConnection, type Socket } from 'node:net';
+import tldts from 'tldts';
+import { Address, IPKind, type Target } from './address.js';
+import { getMtaStsPolicy, isMxAllowed } from './mta-sts.js';
+import { DNSResolver, ResolverKind } from './resolver.js';
+import { TXTRecord, TXTResult } from './txt-record.js';
+import { DNS_ERRORS } from './types/error.js';
+import type { DomainCheckerOptions, ResolveOptions } from './types/options.js';
+
+export type { MxRecord };
+export type { Socket };
 
 export class DomainChecker {
 	private options: DomainCheckerOptions;
-	private resolver: Resolver;
-	private failoverResolvers: Resolver[] = [];
+	private resolver: DNSResolver;
+	private failoverResolvers: DNSResolver[] = [];
 
 	constructor(options?: DomainCheckerOptions) {
 		const defaultOptions: DomainCheckerOptions = {
-			dkimSelector: "mx",
+			dkimSelector: 'default',
 			smtpTimeout: 5000,
 			dnsTimeout: -1,
-			useTargetNameServer: false,
+			useHostNameServer: false,
 			tries: 4,
+			useMtaSts: true,
 			failoverServers: [
-				["1.1.1.1", "1.0.0.1"],
-				["8.8.8.8", "8.8.4.4"],
+				['1.1.1.1', '1.0.0.1'],
+				['8.8.8.8', '8.8.4.4'],
 			],
-			blockReservedIPs: true,
+			blockLocalIPs: false,
+			deliveryPort: 25,
 		};
 
 		this.options = { ...defaultOptions, ...(options ?? {}) };
 
-		this.resolver = new Resolver({
+		this.resolver = new DNSResolver({
 			timeout: this.options.dnsTimeout,
 			tries: this.options.tries,
 		});
+
 		if (this.options.server) {
+			this.resolver.kind = ResolverKind.Custom;
 			this.resolver.setServers(this.options.server);
+		} else {
+			this.resolver.kind = ResolverKind.System;
 		}
 
-		for (const server of this.options.failoverServers ?? []) {
-			const resolver = new Resolver({
-				timeout: this.options.dnsTimeout,
-				tries: this.options.tries,
-			});
+		if (this.options.failoverServers) {
+			for (const failoverServer of this.options.failoverServers) {
+				const resolver = new DNSResolver({
+					timeout: this.options.dnsTimeout,
+					tries: this.options.tries,
+					kind: ResolverKind.Failover,
+				});
 
-			if (this.options.server) {
-				if (server.includes(this.options.server[0])) {
-					continue;
+				if (this.options.server) {
+					if (failoverServer.includes(this.options.server[0])) {
+						continue;
+					}
 				}
+
+				resolver.setServers(failoverServer);
+				this.failoverResolvers.push(resolver);
 			}
 
-			resolver.setServers(server);
-			this.failoverResolvers.push(resolver);
-		}
-
-		if (this.options.server) {
-			const defaultResolver = new Resolver({
-				timeout: this.options.dnsTimeout,
-				tries: this.options.tries,
-			});
-			this.failoverResolvers.push(defaultResolver);
+			if (this.options.server) {
+				const defaultResolver = new DNSResolver({
+					timeout: this.options.dnsTimeout,
+					tries: this.options.tries,
+					kind: ResolverKind.FailoverSystem,
+				});
+				this.failoverResolvers.push(defaultResolver);
+			}
 		}
 	}
 
-	private async getNsResolver(hostname: string): Promise<Resolver> {
+	public async getNsResolver(target: Target): Promise<DNSResolver> {
+		const addr = Address.loadFromTarget(target);
 		try {
-			const nsHosts = await this.resolver.resolveNs(hostname); // ["ns1.example.net", ...]
+			// ["ns1.example.net", ...]
+			const nsHosts = await this.resolver.resolveNs(addr.hostname).catch(() => []);
 			const ips: string[] = [];
 
 			for (const ns of nsHosts) {
@@ -76,16 +97,26 @@ export class DomainChecker {
 				}
 			}
 
-			const resolver = new Resolver({
+			const resolver = new DNSResolver({
 				timeout: this.options.dnsTimeout,
 				tries: this.options.tries,
+				kind: ResolverKind.HostNameServer,
+				nsHosts,
 			});
 			if (ips.length > 0) {
 				resolver.setServers(ips);
-			} // else leave resolver with system servers as fallback
-			return resolver;
+				return resolver;
+			} else {
+				// mail.example.net -> example.net
+				const nsDomain = tldts.getDomain(addr.hostname);
+				if (nsDomain !== null && nsDomain !== addr.hostname) {
+					return await this.getNsResolver(nsDomain);
+				} else {
+					return this.resolver;
+				}
+			}
 		} catch {
-			// fallback: sistem resolver
+			// fallback: system resolver
 			return this.resolver;
 		}
 	}
@@ -94,55 +125,116 @@ export class DomainChecker {
 		const addr = Address.loadFromTarget(target);
 
 		try {
-			const addresses = await this.getMxRecord(addr.hostname);
+			const addresses = await this.getMxRecord({
+				target: addr,
+				useCache: false,
+				useOnlyHostNameServer: false,
+			});
 			return Array.isArray(addresses) && addresses.length > 0;
 		} catch {
 			return false;
 		}
 	}
 
-	public async getMxRecord(target: Target): Promise<MxRecord[]> {
-		const addr = Address.loadFromTarget(target);
+	private async cleanMxRecord(records: MxRecord[], resolveOptions: ResolveOptions): Promise<MxRecord[]> {
+		if (!this.options.useMtaSts || records.length === 0) {
+			return records;
+		}
+
+		try {
+			// Get MTA-STS DNS record
+			const stsRecord = await this.getMtaStsRecord(resolveOptions);
+			const policyId = stsRecord?.getSTSPolicyId();
+
+			if (!policyId) {
+				// No MTA-STS configured
+				return records;
+			}
+
+			// Fetch policy file
+			const policy = await getMtaStsPolicy(resolveOptions.target);
+
+			if (!policy) {
+				// Policy file not found or invalid
+				return records;
+			}
+
+			// Filter MX records based on policy
+			const allowedRecords = records.filter((record) => isMxAllowed(record.exchange, policy));
+
+			// If policy mode is 'enforce' and no MX matches, return empty (fail delivery)
+			if (policy.mode === 'enforce' && allowedRecords.length === 0) {
+				return [];
+			}
+
+			// If policy mode is 'testing', log but don't filter
+			if (policy.mode === 'testing') {
+				const blockedRecords = records.filter((record) => !isMxAllowed(record.exchange, policy));
+				if (blockedRecords.length > 0) {
+					// In testing mode, just log violations but return all records
+					console.warn(
+						`MTA-STS testing mode: ${blockedRecords.length} MX records would be blocked:`,
+						blockedRecords.map((r) => r.exchange),
+					);
+				}
+				return records;
+			}
+
+			// For 'enforce' mode, return only allowed records
+			return allowedRecords.length > 0 ? allowedRecords : records;
+		} catch (error) {
+			// On error, return original records (fail open)
+			console.error('MTA-STS check failed:', error);
+			return records;
+		}
+	}
+
+	public async getMxRecord(resolveOptions: ResolveOptions): Promise<MxRecord[]> {
+		let result: MxRecord[] = [];
+		resolveOptions.target = Address.loadFromTarget(resolveOptions.target);
 
 		let lastError: Error;
 		try {
-			return await this.getMxRecordWithFallback(addr);
+			result = await this.resolveMxWithFailover(resolveOptions);
+			// Apply MTA-STS filtering
+			result = await this.cleanMxRecord(result, resolveOptions);
+			return result;
 		} catch (error) {
 			lastError = error as Error;
 		}
 
-		for (const resolver of this.failoverResolvers) {
-			try {
-				return await this.getMxRecordWithFallback(addr, resolver);
-			} catch (error) {
-				lastError = error as Error;
+		if (resolveOptions.useOnlyHostNameServer !== true) {
+			for (const resolver of this.failoverResolvers) {
+				try {
+					result = await this.resolveMxWithFailover(resolveOptions, resolver);
+					// Apply MTA-STS filtering
+					result = await this.cleanMxRecord(result, resolveOptions);
+					return result;
+				} catch (error) {
+					lastError = error as Error;
+				}
 			}
+		}
+
+		const err = lastError as NodeJS.ErrnoException | undefined;
+		const code = err?.code;
+
+		if (code === DNS_ERRORS.NODATA || code === DNS_ERRORS.NOTFOUND) {
+			return [];
 		}
 
 		throw lastError;
 	}
 
-	private async getMxRecordWithFallback(target: Address, fallback?: Resolver): Promise<MxRecord[]> {
-		try {
-			let resolver = fallback ? fallback : this.resolver;
-			if (this.options.useTargetNameServer && !fallback) {
-				resolver = await this.getNsResolver(target.hostname);
-			}
-			const result = await resolver.resolveMx(target.hostname);
-			return result;
-		} catch (error) {
-			if (error instanceof Error && "code" in error) {
-				// TODO SERVFAIL ise fallback dns kullan
-				// || error.code === SERVFAIL
-				if (error.code === DNS_ERRORS.NODATA || error.code === DNS_ERRORS.NOTFOUND) {
-					return [];
-				}
-
-				throw error;
-			}
-
-			throw new Error(String(error));
+	private async resolveMxWithFailover(resolveOptions: ResolveOptions, fallback?: DNSResolver): Promise<MxRecord[]> {
+		resolveOptions.target = Address.loadFromTarget(resolveOptions.target);
+		let resolver = fallback ? fallback : this.resolver;
+		if ((this.options.useHostNameServer || resolveOptions.useOnlyHostNameServer) && !fallback) {
+			resolver = await this.getNsResolver(resolveOptions.target);
 		}
+		const result = await resolver.resolveMx(resolveOptions.target.hostname);
+		const sorted = [...result].sort((a, b) => a.priority - b.priority);
+		return sorted;
 	}
 
 	public async getNameServers(target: Target): Promise<string[]> {
@@ -151,5 +243,178 @@ export class DomainChecker {
 		const nsHosts = await this.resolver.resolveNs(addr.hostname);
 
 		return nsHosts;
+	}
+
+	public async getSmtpConnection(target: Target): Promise<Socket | null> {
+		const addr = Address.loadFromTarget(target);
+
+		// Get MX records
+		const mxRecords = await this.getMxRecord({
+			target: addr,
+			useCache: false,
+			useOnlyHostNameServer: false,
+		});
+
+		if (mxRecords.length === 0) {
+			throw new Error('No MX records found');
+		}
+
+		// Check for local IPs if blocking is enabled
+		if (this.options.blockLocalIPs) {
+			const mxAddr = new Address(mxRecords[0].exchange);
+			if (mxAddr.isLocal) {
+				throw new Error('Local IP addresses are blocked');
+			}
+		}
+
+		const port = this.options.deliveryPort || 25;
+		let lastError: Error | null = null;
+
+		// Try each MX record in priority order
+		for (const mx of mxRecords) {
+			try {
+				const socket = await this.connectToSmtp(mx.exchange, port);
+				return socket;
+			} catch (error) {
+				lastError = error as Error;
+			}
+		}
+
+		throw lastError || new Error('Failed to connect to any MX server');
+	}
+
+	private connectToSmtp(host: string, port: number): Promise<ReturnType<typeof createConnection>> {
+		return new Promise((resolve, reject) => {
+			const signal = AbortSignal.timeout(this.options.smtpTimeout || 5000);
+
+			const socket = createConnection({ host, port, keepAlive: true, timeout: 1000, signal });
+
+			//socket.setTimeout(1000);
+
+			// If timeout is 0, then the existing idle timeout is disabled.
+			socket.on('timeout', () => {
+				console.log('socket timeout');
+				socket.end();
+			});
+
+			socket.once('connect', () => {
+				resolve(socket);
+			});
+
+			socket.once('error', (error) => {
+				socket.destroy();
+				reject(error);
+			});
+		});
+	}
+
+	private get_dkim_addr(addr: Address, selector?: string): Address | null {
+		if (addr.ipKind === IPKind.None && addr.hostname) {
+			selector = selector ? selector : this.options.dkimSelector;
+			return new Address(`${selector}._domainkey.${addr.hostname}`);
+		}
+		return null;
+	}
+
+	public async getDkimRecord(resolveOptions: ResolveOptions): Promise<TXTResult | null> {
+		const addr = Address.loadFromTarget(resolveOptions.target);
+
+		const dkimAddr = this.get_dkim_addr(addr, resolveOptions.dkimSelector);
+
+		if (dkimAddr) {
+			resolveOptions.target = dkimAddr;
+			return await this.getTxtRecord(resolveOptions);
+		}
+
+		return null;
+	}
+
+	private get_dmarc_addr(addr: Address): Address | null {
+		//  RFC 7489
+		if (addr.ipKind === IPKind.None && addr.hostname) {
+			return new Address(`_dmarc.${addr.hostname}`);
+		}
+		return null;
+	}
+
+	public async getDmarcRecord(resolveOptions: ResolveOptions): Promise<TXTResult | null> {
+		const addr = Address.loadFromTarget(resolveOptions.target);
+
+		const dmarcAddr = this.get_dmarc_addr(addr);
+
+		if (dmarcAddr) {
+			resolveOptions.target = dmarcAddr;
+			return await this.getTxtRecord(resolveOptions);
+		}
+
+		return null;
+	}
+
+	private get_mta_sts_addr(addr: Address): Address | null {
+		if (addr.ipKind === IPKind.None && addr.hostname) {
+			return new Address(`_mta-sts.${addr.hostname}`);
+		}
+		return null;
+	}
+
+	public async getMtaStsRecord(resolveOptions: ResolveOptions): Promise<TXTResult | null> {
+		const addr = Address.loadFromTarget(resolveOptions.target);
+		const mtaStsAddr = this.get_mta_sts_addr(addr);
+
+		if (mtaStsAddr) {
+			const opts = { ...resolveOptions };
+			opts.target = mtaStsAddr;
+			return await this.getTxtRecord(opts);
+		}
+
+		return null;
+	}
+
+	public async getTxtRecord(resolveOptions: ResolveOptions): Promise<TXTResult | null> {
+		let lastError: Error;
+		try {
+			return await this.getTxtRecordWithFailover(resolveOptions);
+		} catch (error) {
+			lastError = error as Error;
+		}
+
+		if (resolveOptions.useOnlyHostNameServer !== true) {
+			for (const resolver of this.failoverResolvers) {
+				try {
+					return await this.getTxtRecordWithFailover(resolveOptions, resolver);
+				} catch (error) {
+					lastError = error as Error;
+				}
+			}
+		}
+
+		const err = lastError as NodeJS.ErrnoException | undefined;
+		const code = err?.code;
+
+		if (code === DNS_ERRORS.NODATA || code === DNS_ERRORS.NOTFOUND) {
+			return null;
+		}
+
+		throw lastError;
+	}
+
+	private async getTxtRecordWithFailover(resolveOptions: ResolveOptions, fallback?: DNSResolver): Promise<TXTResult> {
+		resolveOptions.target = Address.loadFromTarget(resolveOptions.target);
+		let resolver = fallback ? fallback : this.resolver;
+		if ((this.options.useHostNameServer || resolveOptions.useOnlyHostNameServer) && !fallback) {
+			resolver = await this.getNsResolver(resolveOptions.target);
+		}
+		const txtRecords = await resolver.resolveTxt(resolveOptions.target.hostname);
+		const flatRecords = txtRecords.flat();
+
+		const result = new TXTResult();
+		for (let flatRecord of flatRecords) {
+			flatRecord = flatRecord?.trim();
+			if (!flatRecord) continue;
+			const record = new TXTRecord(flatRecord);
+			result.records.push(record);
+		}
+
+		return result;
 	}
 }

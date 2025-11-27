@@ -43,6 +43,9 @@
 		"@types/node": "^20.6.2",
 		"@vitest/ui": "^4.0.13",
 		"cpy-cli": "^6.0.0",
+		"dkim-key": "^2.0.0",
+		"dmarc-solution": "^1.2.5",
+		"parse-spf": "^1.0.1-1",
 		"rimraf": "^5.0.1",
 		"typescript": "^5.4.2",
 		"vitest": "^4.0.13"
@@ -76,6 +79,6 @@
 		"node": ">=18"
 	},
 	"dependencies": {
-		"ipaddr.js": "^2.2.0"
+		"tldts": "^7.0.19"
 	}
 }

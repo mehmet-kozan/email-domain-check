@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import path from "node:path";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -31,7 +31,7 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			"email-domain-check": resolve(__dirname, "src/"),
+			"email-domain-check": path.resolve(__dirname, "src"),
 		},
 	},
 });

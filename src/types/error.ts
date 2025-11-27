@@ -1,20 +1,5 @@
 import dns from "node:dns";
 
-export type { MxRecord } from "node:dns";
-
-export interface DomainCheckerOptions {
-	server?: string[];
-	dkimSelector?: string;
-	useCache?: boolean;
-	smtpTimeout?: number;
-	dnsTimeout?: number;
-	useTargetNameServer?: boolean;
-	ignoreIPv6?: boolean;
-	tries?: number;
-	failoverServers?: Array<string[]>;
-	blockReservedIPs?: boolean;
-}
-
 export const DNS_ERRORS = {
 	NODATA: dns.NODATA, // No data: query completed but no records of requested type
 	FORMERR: dns.FORMERR, // Format error: name server could not parse the query
