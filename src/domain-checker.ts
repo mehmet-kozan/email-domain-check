@@ -6,33 +6,18 @@ import { getMtaStsPolicy, isMxAllowed } from './mta-sts.js';
 import { DNSResolver, ResolverKind } from './resolver.js';
 import { TXTRecord, TXTResult } from './txt-record.js';
 import { DNS_ERRORS } from './types/error.js';
-import type { DomainCheckerOptions, ResolveOptions } from './types/options.js';
+import type { DomainCheckerOptions, ResolveOptions, SafeDCOptions } from './types/options.js';
+import { setSafeDCOptions } from './types/options.js';
 
-export type { MxRecord };
-export type { Socket };
+export type { MxRecord, Socket, DomainCheckerOptions, ResolveOptions };
 
 export class DomainChecker {
-	private options: DomainCheckerOptions;
+	private options: SafeDCOptions;
 	private resolver: DNSResolver;
 	private failoverResolvers: DNSResolver[] = [];
 
 	constructor(options?: DomainCheckerOptions) {
-		const defaultOptions: DomainCheckerOptions = {
-			dkimSelector: 'default',
-			smtpTimeout: 5000,
-			dnsTimeout: -1,
-			useHostNameServer: false,
-			tries: 4,
-			useMtaSts: true,
-			failoverServers: [
-				['1.1.1.1', '1.0.0.1'],
-				['8.8.8.8', '8.8.4.4'],
-			],
-			blockLocalIPs: false,
-			deliveryPort: 25,
-		};
-
-		this.options = { ...defaultOptions, ...(options ?? {}) };
+		this.options = setSafeDCOptions(options);
 
 		this.resolver = new DNSResolver({
 			timeout: this.options.dnsTimeout,
@@ -128,7 +113,7 @@ export class DomainChecker {
 			const addresses = await this.getMxRecord({
 				target: addr,
 				useCache: false,
-				useOnlyHostNameServer: false,
+				preferDomainNS: false,
 			});
 			return Array.isArray(addresses) && addresses.length > 0;
 		} catch {
@@ -203,7 +188,7 @@ export class DomainChecker {
 			lastError = error as Error;
 		}
 
-		if (resolveOptions.useOnlyHostNameServer !== true) {
+		if (resolveOptions.preferDomainNS !== true) {
 			for (const resolver of this.failoverResolvers) {
 				try {
 					result = await this.resolveMxWithFailover(resolveOptions, resolver);
@@ -229,7 +214,7 @@ export class DomainChecker {
 	private async resolveMxWithFailover(resolveOptions: ResolveOptions, fallback?: DNSResolver): Promise<MxRecord[]> {
 		resolveOptions.target = Address.loadFromTarget(resolveOptions.target);
 		let resolver = fallback ? fallback : this.resolver;
-		if ((this.options.useHostNameServer || resolveOptions.useOnlyHostNameServer) && !fallback) {
+		if ((this.options.useDomainNS || resolveOptions.preferDomainNS) && !fallback) {
 			resolver = await this.getNsResolver(resolveOptions.target);
 		}
 		const result = await resolver.resolveMx(resolveOptions.target.hostname);
@@ -252,7 +237,7 @@ export class DomainChecker {
 		const mxRecords = await this.getMxRecord({
 			target: addr,
 			useCache: false,
-			useOnlyHostNameServer: false,
+			preferDomainNS: false,
 		});
 
 		if (mxRecords.length === 0) {
@@ -267,7 +252,7 @@ export class DomainChecker {
 			}
 		}
 
-		const port = this.options.deliveryPort || 25;
+		const port = this.options.deliveryPort;
 		let lastError: Error | null = null;
 
 		// Try each MX record in priority order
@@ -285,15 +270,16 @@ export class DomainChecker {
 
 	private connectToSmtp(host: string, port: number): Promise<ReturnType<typeof createConnection>> {
 		return new Promise((resolve, reject) => {
-			const signal = AbortSignal.timeout(this.options.smtpTimeout || 5000);
+			const signal = AbortSignal.timeout(this.options.smtpTimeout);
 
-			const socket = createConnection({ host, port, keepAlive: true, timeout: 1000, signal });
+			const socket = createConnection({ host, port, keepAlive: true, signal });
 
-			//socket.setTimeout(1000);
+			if (this.options.socketIdleTimeout) {
+				socket.setTimeout(this.options.socketIdleTimeout);
+			}
 
 			// If timeout is 0, then the existing idle timeout is disabled.
 			socket.on('timeout', () => {
-				console.log('socket timeout');
 				socket.end();
 			});
 
@@ -378,7 +364,7 @@ export class DomainChecker {
 			lastError = error as Error;
 		}
 
-		if (resolveOptions.useOnlyHostNameServer !== true) {
+		if (resolveOptions.preferDomainNS !== true) {
 			for (const resolver of this.failoverResolvers) {
 				try {
 					return await this.getTxtRecordWithFailover(resolveOptions, resolver);
@@ -401,7 +387,7 @@ export class DomainChecker {
 	private async getTxtRecordWithFailover(resolveOptions: ResolveOptions, fallback?: DNSResolver): Promise<TXTResult> {
 		resolveOptions.target = Address.loadFromTarget(resolveOptions.target);
 		let resolver = fallback ? fallback : this.resolver;
-		if ((this.options.useHostNameServer || resolveOptions.useOnlyHostNameServer) && !fallback) {
+		if ((this.options.useDomainNS || resolveOptions.preferDomainNS) && !fallback) {
 			resolver = await this.getNsResolver(resolveOptions.target);
 		}
 		const txtRecords = await resolver.resolveTxt(resolveOptions.target.hostname);

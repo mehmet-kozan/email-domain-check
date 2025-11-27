@@ -1,29 +1,46 @@
+<div align="center"> 
+
 # email-domain-check
+
+**A comprehensive email domain validation library.** 
+**Supports DNS, MX, SMTP, DKIM, DMARC, and MTA-STS.**  
+
+</div> 
+
+<div align="center">  
 
 [![version](https://img.shields.io/npm/v/email-domain-check.svg)](https://www.npmjs.org/package/email-domain-check)
 [![downloads](https://img.shields.io/npm/dt/email-domain-check.svg)](https://www.npmjs.org/package/email-domain-check)
-[![node](https://img.shields.io/node/v/email-domain-check.svg)](https://nodejs.org/)
+[![node](https://img.shields.io/node/v/email-domain-check.svg)](https://nodejs.org/)  
 
-A comprehensive email domain validation library with DNS, MX, SMTP, DKIM, DMARC, and MTA-STS support.
+</div>
+
+<br />
+
+## Features
+
+-  MX record validation
+-  SMTP server connection testing
+-  DKIM record lookup
+-  DMARC policy validation
+-  MTA-STS support (RFC 8461)
+-  IPv4/IPv6 support
+-  Local IP blocking
+-  DNS failover resolvers
+-  Punycode/IDN support
+-  TypeScript support
 
 ## Installation
 
 ```bash
 npm install email-domain-check
+# or
+pnpm add email-domain-check
+# or
+yarn add email-domain-check
+# or
+bun add email-domain-check
 ```
-
-## Features
-
-- ✅ MX record validation
-- ✅ SMTP server connection testing
-- ✅ DKIM record lookup
-- ✅ DMARC policy validation
-- ✅ MTA-STS support (RFC 8461)
-- ✅ IPv4/IPv6 support
-- ✅ Local IP blocking
-- ✅ DNS failover resolvers
-- ✅ Punycode/IDN support
-- ✅ TypeScript support
 
 ## Usage (ESM / TypeScript)
 
@@ -40,7 +57,7 @@ console.log("Has MX:", hasMx);
 const mxRecords = await checker.getMxRecord({
   target: "example.com",
   useCache: false,
-  useOnlyHostNameServer: false
+  preferDomainNS: false
 });
 console.log("MX Records:", mxRecords);
 // [{ exchange: 'mail.example.com', priority: 10 }]
@@ -143,16 +160,21 @@ checker.getSmtpConnection("user@example.com").then(socket => {
 
 ```ts
 interface DomainCheckerOptions {
-  dkimSelector?: string;        // Default: 'default'
-  smtpTimeout?: number;         // Default: 5000ms
-  dnsTimeout?: number;          // Default: -1 (no timeout)
-  useHostNameServer?: boolean;  // Default: false
-  tries?: number;               // Default: 4
-  useMtaSts?: boolean;          // Default: true
-  failoverServers?: string[][]; // DNS failover servers
-  blockLocalIPs?: boolean;      // Default: false
-  deliveryPort?: number;        // Default: 25
   server?: string[];            // Custom DNS servers
+  dkimSelector?: string;        // Default: 'default'
+  useCache?: boolean;           // Enable DNS caching
+  cacheTTL?: number;            // Cache TTL in ms
+  smtpTimeout?: number;         // Default: 10000
+  dnsTimeout?: number;          // Default: 5000
+  httpTimeout?: number;         // Default: 8000
+  socketIdleTimeout?: number;   // RFC 5321 socket idle timeout
+  useDomainNS?: boolean;        // Query domain's authoritative nameservers (Default: false)
+  useMtaSts?: boolean;          // Enable MTA-STS related lookups (Default: false)
+  ignoreIPv6?: boolean;         // Ignore IPv6 addresses
+  tries?: number;               // Default: 3
+  failoverServers?: string[][]; // Default: [['1.1.1.1','1.0.0.1'], ['8.8.8.8','8.8.4.4']]
+  blockLocalIPs?: boolean;      // Block local/private IPs (Default: false)
+  deliveryPort?: number;        // Default: 25
 }
 ```
 
@@ -172,7 +194,6 @@ interface DomainCheckerOptions {
 #### Static Methods
 
 - `Address.loadFromTarget(target: string | Address): Address` - Parse email/domain
-- `Address.loadFromUrl(url: string): Address` - Parse from URL
 
 #### Properties
 
@@ -187,7 +208,7 @@ interface DomainCheckerOptions {
 ### MTA-STS
 
 ```ts
-import { getMtaStsPolicy, isMxAllowed } from "email-domain-check/mta-sts";
+import { getMtaStsPolicy, isMxAllowed } from "email-domain-check";
 
 // Get MTA-STS policy from https://mta-sts.{domain}/.well-known/mta-sts.txt
 const policy = await getMtaStsPolicy("example.com");

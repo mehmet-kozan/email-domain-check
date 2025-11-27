@@ -58,18 +58,6 @@ export class Address {
 		}
 	}
 
-	// public static loadFromUrl(url: string | URL): Address {
-	// 	let source: string;
-	// 	if (typeof url === "string") {
-	// 		source = url;
-	// 		url = new URL(url);
-	// 	} else {
-	// 		source = url.href;
-	// 	}
-
-	// 	return new Address(url.hostname, source);
-	// }
-
 	public static loadFromTarget(target: Target): Address {
 		if (target instanceof Address) {
 			return target;
