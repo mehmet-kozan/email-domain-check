@@ -6,7 +6,7 @@ export default defineConfig({
 		environment: 'node',
 		slowTestThreshold: 1000,
 		globals: true,
-		include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.cts'],
+		include: ['tests/unit/**/*.test.ts'],
 		exclude: ['tests/unit/**/_*', 'tests/unit/_**/*'],
 		reporters: ['default', 'html'],
 		testTimeout: 15000,

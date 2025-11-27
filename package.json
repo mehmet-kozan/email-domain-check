@@ -33,12 +33,14 @@
 		"email-validator"
 	],
 	"scripts": {
-		"test": "vitest run",
 		"build:esm": "tsc -p tsconfig.esm.json",
 		"build:cjs": "tsc -p tsconfig.cjs.json",
 		"build": "npm run clean && npm run build:esm && npm run build:cjs",
 		"postbuild": "cpy  ./package.cjs.json ./dist/cjs/ --rename=package.json",
 		"clean": "rimraf dist",
+		"test": "vitest run",
+		"test:package": "vitest run --config vitest.config.package.ts",
+		"test:all": "npm run test && npm run test:package",
 		"lint": "biome lint .",
 		"format": "biome format --write .",
 		"format:all": "biome check --write .",
