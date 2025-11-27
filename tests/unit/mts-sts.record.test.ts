@@ -1,15 +1,15 @@
-import { DomainChecker, TXTResult } from 'email-domain-check';
+import { DomainChecker } from 'email-domain-check';
 import { describe, expect, it } from 'vitest';
 
-describe('general test default export', () => {
+describe('getStsRecord', () => {
 	const checker = new DomainChecker();
 
-	it('returns true for valid domain', async () => {
-		const result = await checker.getMtaStsRecord({
+	it('valid sts record', async () => {
+		const result = await checker.getStsRecord({
 			target: 'mehmet.kozan@gmail.com',
 		});
 		expect(result).not.toBeNull();
-		expect(result).toBeInstanceOf(TXTResult);
-		expect(result?.records.length).toBe(1);
+		expect(result).toHaveProperty('raw');
+		expect(typeof result?.raw).toBe('string');
 	});
 });

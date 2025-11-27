@@ -42,54 +42,154 @@ yarn add email-domain-check
 bun add email-domain-check
 ```
 
-## Usage (ESM / TypeScript)
+## Usage (ESM / TypeScript)  
 
 ```ts
-import { DomainChecker, Address } from "email-domain-check";
+import { Address, DomainChecker } from 'email-domain-check';
 
 const checker = new DomainChecker();
 
 // Check if domain has MX records
-const hasMx = await checker.hasMxRecord("user@example.com");
-console.log("Has MX:", hasMx);
+const hasMx = await checker.hasMxRecord('user@gmail.com');
+console.log('Has MX:', hasMx);
 
 // Get MX records with priority
 const mxRecords = await checker.getMxRecord({
-  target: "example.com",
-  useCache: false,
-  preferDomainNS: false
+	target: 'gmail.com', // string, URL or Address
+	useCache: false,
+	preferDomainNS: false, // use authoritative ns `ns1.google.com`
 });
-console.log("MX Records:", mxRecords);
-// [{ exchange: 'mail.example.com', priority: 10 }]
+console.log('MX Records:', mxRecords);
+// [{ exchange: 'gmail-smtp-in.l.google.com', priority: 5 }]
 
-// Test SMTP connection
+// use url, domain or email
+const url = new URL('https://gmail.com');
+const addr_01 = Address.loadFromTarget(url);
+const addr_02 = Address.loadFromTarget('gmail.com');
+const addr_03 = Address.loadFromTarget('user@gmail.com');
+const addr_04 = new Address('mehmet.kozan@gmail.com'); // email or domain
+
+console.log('Has MX 01:', await checker.hasMxRecord(addr_01));
+console.log('Has MX 02:', await checker.hasMxRecord(addr_02));
+console.log('Has MX 03:', await checker.hasMxRecord(addr_03));
+console.log('Has MX 04:', await checker.hasMxRecord(addr_04));
+// or direct use
+console.log('Has MX 05:', await checker.hasMxRecord(new URL('https://gmail.com')));
+console.log('Has MX 06:', await checker.hasMxRecord('gmail.com'));
+console.log('Has MX 07:', await checker.hasMxRecord('user@gmail.com'));
+console.log('Has MX 08:', await checker.hasMxRecord('mehmet.kozan@gmail.com'));
+```
+
+## Usage (CommonJS)
+
+```js
+const { DomainChecker } = require('email-domain-check');
+
+async function run() {
+	const checker = new DomainChecker();
+
+	// Check if domain has MX records
+	const hasMx = await checker.hasMxRecord('user@gmail.com');
+	console.log('Has MX:', hasMx);
+
+	// Get MX records with priority
+	const mxRecords = await checker.getMxRecord({
+		target: 'gmail.com', // string, URL or Address
+		useCache: false,
+		preferDomainNS: false, // use authoritative ns `ns1.google.com`
+	});
+	console.log('MX Records:', mxRecords);
+	// [{ exchange: 'gmail-smtp-in.l.google.com', priority: 5 }]
+}
+
+run();
+```
+
+## Advance Usage
+
+#### Get Records
+```ts
+import { DomainChecker } from 'email-domain-check';
+
+const checker = new DomainChecker();
+
+// Get SPF record
+const spf = await checker.getSpfRecord({
+	target: 'mehmet.kozan@cambly.com',
+	dkimSelector: 'k1',
+});
+console.log('SPF:', spf);
+
+// Get DKIM record
+const dkim = await checker.getDkimRecord({
+	target: 'mehmet.kozan@cambly.com',
+	dkimSelector: 'k1',
+});
+console.log('DKIM:', dkim);
+
+// Get DMARC record
+const dmarc = await checker.getDmarcRecord({
+	target: 'gmail.com',
+});
+console.log('DMARC:', dmarc);
+
+// Get MTA-STS record
+const sts = await checker.getStsRecord({
+	target: 'user@gmail.com',
+});
+console.log('MTA-STS:', sts);
+
+// Get custom records
+const customRecords = await checker.getCustomRecords({
+	target: 'user@gmail.com',
+});
+console.log('Custom Records:', customRecords);
+
+// Get custom kv record
+const kvRecord = await checker.getCustomKVRecord(
+	{
+		target: 'user@gmail.com',
+	},
+	'yahoo-verification-key',
+);
+console.log('KV Record:', kvRecord);
+
+// Get custom kv record
+const allKVRecord = await checker.getAllKVRecords({
+	target: 'user@gmail.com',
+});
+console.log('All KV Records:', allKVRecord);
+```
+
+#### Get Authoritative Name Servers
+
+```ts
+import { DomainChecker } from "email-domain-check";
+const checker = new DomainChecker();
+
+// Get name servers
+const nameServers = await checker.getNameServers("gmail.com");
+console.log("Name Servers:", nameServers);
+
+
+```
+
+#### Get SMTP Connection
+```ts
+import { DomainChecker } from "email-domain-check";
+
+const checker = new DomainChecker();
+// Test or Get SMTP connection for mail sending
 const socket = await checker.getSmtpConnection("user@example.com");
 if (socket) {
   console.log("SMTP connection successful");
   socket.end();
 }
+```
 
-// Get DKIM record
-const dkim = await checker.getDkimRecord({
-  target: "example.com",
-  selector: "default"
-});
-console.log("DKIM:", dkim?.records);
-
-// Get DMARC policy
-const dmarc = await checker.getDmarcRecord({
-  target: "example.com"
-});
-console.log("DMARC:", dmarc?.records);
-
-// Get MTA-STS DNS record
-const mtaSts = await checker.getMtaStsRecord({
-  target: "example.com"
-});
-console.log("MTA-STS ID:", mtaSts?.getSTSPolicyId());
-
-// Get MTA-STS policy file
-import { getMtaStsPolicy, isMxAllowed } from "email-domain-check/mta-sts";
+#### MTA-STS Policy
+```ts
+import { getMtaStsPolicy, isMxAllowed } from "email-domain-check";
 
 const policy = await getMtaStsPolicy("gmail.com");
 if (policy) {
@@ -99,11 +199,11 @@ if (policy) {
   const allowed = isMxAllowed("alt1.gmail-smtp-in.l.google.com", policy);
   console.log("MX Allowed:", allowed);
 }
+```
 
-// Get name servers
-const nameServers = await checker.getNameServers("example.com");
-console.log("Name Servers:", nameServers);
-
+#### Address Parsing and Validation
+```ts
+import {Address } from "email-domain-check";
 // Address parsing and validation
 const addr = Address.loadFromTarget("user@example.com");
 console.log("Hostname:", addr.hostname); // example.com
@@ -113,48 +213,21 @@ console.log("Is Local:", addr.isLocal); // false
 console.log("Has Punycode:", addr.hasPunycode); // false
 
 // Parse from URL
-const urlAddr = Address.loadFromUrl("https://example.com/path");
+const url = new URL("https://example.com/path");
+const urlAddr = Address.loadFromTarget(url);
 console.log("From URL:", urlAddr.hostname); // example.com
 
 // IP address validation
-const ipAddr = new Address("192.168.1.1");
-console.log("Is Local IP:", ipAddr.isLocal); // true
+const Addr_01 = new Address("192.168.1.1");
+console.log("Is Local IP:", Addr_01.isLocal); // true
 
-const publicIp = new Address("8.8.8.8");
-console.log("Is Public IP:", !publicIp.isLocal); // true
-```
-
-## Usage (CommonJS)
-
-```js
-const { DomainChecker } = require("email-domain-check");
-
-const checker = new DomainChecker();
-
-// Check MX records
-checker.hasMxRecord("user@example.com").then(result => {
-  console.log("Has MX:", result);
-});
-
-// Get MX records
-checker.getMxRecord({ target: "example.com" }).then(records => {
-  console.log("MX Records:", records);
-});
-
-// Test SMTP connection
-checker.getSmtpConnection("user@example.com").then(socket => {
-  if (socket) {
-    console.log("Connected to SMTP server");
-    socket.end();
-  }
-}).catch(error => {
-  console.error("Connection failed:", error.message);
-});
+const Addr_02 = new Address("8.8.8.8");
+console.log("Is Local IP:", Addr_02.isLocal); // false
 ```
 
 ## API
 
-### DomainChecker
+### DomainChecker Class
 
 #### Constructor Options
 
@@ -183,17 +256,32 @@ interface DomainCheckerOptions {
 - `hasMxRecord(target: Target): Promise<boolean>` - Check if domain has MX records
 - `getMxRecord(options: ResolveOptions): Promise<MxRecord[]>` - Get MX records
 - `getSmtpConnection(target: Target): Promise<Socket | null>` - Test SMTP connection
-- `getDkimRecord(options: ResolveOptions): Promise<TXTResult | null>` - Get DKIM record
-- `getDmarcRecord(options: ResolveOptions): Promise<TXTResult | null>` - Get DMARC record
-- `getMtaStsRecord(options: ResolveOptions): Promise<TXTResult | null>` - Get MTA-STS DNS record
-- `getTxtRecord(options: ResolveOptions): Promise<TXTResult | null>` - Get any TXT record
+- `getTxtRecord(options: ResolveOptions): Promise<TXTResult | null>` - Get all TXT records parsed
+- `getSpfRecord(options: ResolveOptions): Promise<SPF1Record | null>` - Get SPF record
+- `getDkimRecord(options: ResolveOptions): Promise<DKIM1Record | null>` - Get DKIM record
+- `getDmarcRecord(options: ResolveOptions): Promise<DMARC1Record | null>` - Get DMARC record
+- `getStsRecord(options: ResolveOptions): Promise<STSv1Record | null>` - Get MTA-STS record
+- `getCustomRecords(options: ResolveOptions): Promise<CustomRecord[] | null>` - Get custom TXT records
+- `getCustomKVRecord(options: ResolveOptions, key: string): Promise<CustomKVRecord | null>` - Get specific key-value record
+- `getAllKVRecords(options: ResolveOptions): Promise<CustomKVRecord[] | null>` - Get all key-value records
 - `getNameServers(target: Target): Promise<string[]>` - Get authoritative name servers
 
-### Address
+### Address Class
 
-#### Static Methods
+#### Constructor
 
-- `Address.loadFromTarget(target: string | Address): Address` - Parse email/domain
+- `new Address(mailOrHost: string) - Create new Address instance`
+
+```ts
+import {Address } from "email-domain-check";
+const addr_01 = new Address('user@gmail.com'); // string email or domain
+const addr_02 = new Address('gmail.com'); 
+
+```
+
+#### Static Constructor Method
+
+- `Address.loadFromTarget(target: string | URL | Address): Address` - Parse email/domain/URL
 
 #### Properties
 
@@ -205,16 +293,5 @@ interface DomainCheckerOptions {
 - `isLocal: boolean` - Is local/private IP
 - `hasPunycode: boolean` - Contains punycode
 
-### MTA-STS
-
-```ts
-import { getMtaStsPolicy, isMxAllowed } from "email-domain-check";
-
-// Get MTA-STS policy from https://mta-sts.{domain}/.well-known/mta-sts.txt
-const policy = await getMtaStsPolicy("example.com");
-
-// Check if MX host is allowed by policy
-const allowed = isMxAllowed("mail.example.com", policy);
-```
 
 

@@ -1,12 +1,12 @@
-import type { ResolverOptions } from "node:dns";
-import dns from "node:dns/promises";
+import type { ResolverOptions } from 'node:dns';
+import dns from 'node:dns/promises';
 
 export enum ResolverKind {
 	System = 0,
 	Custom = 1,
 	Failover = 2,
 	FailoverSystem = 3,
-	HostNameServer = 4,
+	DomainNS = 4,
 }
 
 export interface DNSResolverOptions extends ResolverOptions {

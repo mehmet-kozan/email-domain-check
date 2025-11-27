@@ -1,15 +1,15 @@
-import { DomainChecker, TXTResult } from 'email-domain-check';
+import { DomainChecker } from 'email-domain-check';
 import { describe, expect, it } from 'vitest';
 
-describe('general test default export', () => {
+describe('getDmarcRecord', () => {
 	const checker = new DomainChecker();
 
-	it('returns true for valid domain', async () => {
+	it('returns valid dmarc record', async () => {
 		const result = await checker.getDmarcRecord({
 			target: 'mehmet.kozan@gmail.com',
 		});
 		expect(result).not.toBeNull();
-		expect(result).toBeInstanceOf(TXTResult);
-		expect(result?.records.length).toBe(1);
+		expect(result).toHaveProperty('raw');
+		expect(typeof result?.raw).toBe('string');
 	});
 });

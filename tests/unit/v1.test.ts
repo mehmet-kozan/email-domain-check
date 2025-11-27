@@ -1,7 +1,7 @@
 import { DomainChecker } from "email-domain-check";
 import { describe, expect, it } from "vitest";
 
-describe("general test default export", () => {
+describe("hasMxRecord", () => {
 	const checker = new DomainChecker();
 	it("returns false for invalid domain", { timeout: 10000 }, async () => {
 		const result = await checker.hasMxRecord("mehmet.kozan@gmailililil.com");

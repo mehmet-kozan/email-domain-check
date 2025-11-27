@@ -1,7 +1,7 @@
 import { DomainChecker, TXTResult } from 'email-domain-check';
 import { describe, expect, it } from 'vitest';
 
-describe('general test default export', () => {
+describe('getTxtRecord', () => {
 	const checker = new DomainChecker();
 
 	it('returns true for valid domain', async () => {

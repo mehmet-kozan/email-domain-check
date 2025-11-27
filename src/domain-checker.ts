@@ -4,6 +4,7 @@ import tldts from 'tldts';
 import { Address, IPKind, type Target } from './address.js';
 import { getMtaStsPolicy, isMxAllowed } from './mta-sts.js';
 import { DNSResolver, ResolverKind } from './resolver.js';
+import type { CustomKVRecord, CustomRecord, DKIM1Record, DMARC1Record, SPF1Record, STSv1Record } from './txt-record.js';
 import { TXTRecord, TXTResult } from './txt-record.js';
 import { DNS_ERRORS } from './types/error.js';
 import type { DomainCheckerOptions, ResolveOptions, SafeDCOptions } from './types/options.js';
@@ -60,6 +61,21 @@ export class DomainChecker {
 		}
 	}
 
+	private getParentDomain(domain: string): string | null {
+		const index = domain.indexOf('.');
+		if (index === -1) return null;
+		const parentDomain = domain.slice(index + 1);
+		const mainDomain = tldts.getDomain(domain);
+
+		if (mainDomain === null) return null;
+
+		if (parentDomain.length > mainDomain.length) {
+			return parentDomain;
+		} else {
+			return mainDomain;
+		}
+	}
+
 	public async getNsResolver(target: Target): Promise<DNSResolver> {
 		const addr = Address.loadFromTarget(target);
 		try {
@@ -85,7 +101,7 @@ export class DomainChecker {
 			const resolver = new DNSResolver({
 				timeout: this.options.dnsTimeout,
 				tries: this.options.tries,
-				kind: ResolverKind.HostNameServer,
+				kind: ResolverKind.DomainNS,
 				nsHosts,
 			});
 			if (ips.length > 0) {
@@ -93,7 +109,7 @@ export class DomainChecker {
 				return resolver;
 			} else {
 				// mail.example.net -> example.net
-				const nsDomain = tldts.getDomain(addr.hostname);
+				const nsDomain = this.getParentDomain(addr.hostname);
 				if (nsDomain !== null && nsDomain !== addr.hostname) {
 					return await this.getNsResolver(nsDomain);
 				} else {
@@ -128,8 +144,8 @@ export class DomainChecker {
 
 		try {
 			// Get MTA-STS DNS record
-			const stsRecord = await this.getMtaStsRecord(resolveOptions);
-			const policyId = stsRecord?.getSTSPolicyId();
+			const stsRecord = await this.getStsRecord(resolveOptions);
+			const policyId = stsRecord?.id;
 
 			if (!policyId) {
 				// No MTA-STS configured
@@ -294,6 +310,30 @@ export class DomainChecker {
 		});
 	}
 
+	public async getCustomRecords(resolveOptions: ResolveOptions): Promise<CustomRecord[] | null> {
+		const result = await this.getTxtRecord(resolveOptions);
+		const record = result?.getCustomRecords() ?? null;
+		return record;
+	}
+
+	public async getCustomKVRecord(resolveOptions: ResolveOptions, key: string): Promise<CustomKVRecord | null> {
+		const result = await this.getTxtRecord(resolveOptions);
+		const record = result?.getCustomKVRecord(key) ?? null;
+		return record;
+	}
+
+	public async getAllKVRecords(resolveOptions: ResolveOptions): Promise<CustomKVRecord[] | null> {
+		const result = await this.getTxtRecord(resolveOptions);
+		const record = result?.getAllKVRecord() ?? null;
+		return record;
+	}
+
+	public async getSpfRecord(resolveOptions: ResolveOptions): Promise<SPF1Record | null> {
+		const result = await this.getTxtRecord(resolveOptions);
+		const record = result?.getSPF() ?? null;
+		return record;
+	}
+
 	private get_dkim_addr(addr: Address, selector?: string): Address | null {
 		if (addr.ipKind === IPKind.None && addr.hostname) {
 			selector = selector ? selector : this.options.dkimSelector;
@@ -302,14 +342,16 @@ export class DomainChecker {
 		return null;
 	}
 
-	public async getDkimRecord(resolveOptions: ResolveOptions): Promise<TXTResult | null> {
+	public async getDkimRecord(resolveOptions: ResolveOptions): Promise<DKIM1Record | null> {
 		const addr = Address.loadFromTarget(resolveOptions.target);
 
 		const dkimAddr = this.get_dkim_addr(addr, resolveOptions.dkimSelector);
 
 		if (dkimAddr) {
 			resolveOptions.target = dkimAddr;
-			return await this.getTxtRecord(resolveOptions);
+			const result = await this.getTxtRecord(resolveOptions);
+			const record = result?.getDKIM() ?? null;
+			return record;
 		}
 
 		return null;
@@ -323,34 +365,38 @@ export class DomainChecker {
 		return null;
 	}
 
-	public async getDmarcRecord(resolveOptions: ResolveOptions): Promise<TXTResult | null> {
+	public async getDmarcRecord(resolveOptions: ResolveOptions): Promise<DMARC1Record | null> {
 		const addr = Address.loadFromTarget(resolveOptions.target);
 
 		const dmarcAddr = this.get_dmarc_addr(addr);
 
 		if (dmarcAddr) {
 			resolveOptions.target = dmarcAddr;
-			return await this.getTxtRecord(resolveOptions);
+			const result = await this.getTxtRecord(resolveOptions);
+			const record = result?.getDMARC() ?? null;
+			return record;
 		}
 
 		return null;
 	}
 
-	private get_mta_sts_addr(addr: Address): Address | null {
+	private get_sts_addr(addr: Address): Address | null {
 		if (addr.ipKind === IPKind.None && addr.hostname) {
 			return new Address(`_mta-sts.${addr.hostname}`);
 		}
 		return null;
 	}
 
-	public async getMtaStsRecord(resolveOptions: ResolveOptions): Promise<TXTResult | null> {
+	public async getStsRecord(resolveOptions: ResolveOptions): Promise<STSv1Record | null> {
 		const addr = Address.loadFromTarget(resolveOptions.target);
-		const mtaStsAddr = this.get_mta_sts_addr(addr);
+		const mtaStsAddr = this.get_sts_addr(addr);
 
 		if (mtaStsAddr) {
 			const opts = { ...resolveOptions };
 			opts.target = mtaStsAddr;
-			return await this.getTxtRecord(opts);
+			const result = await this.getTxtRecord(opts);
+			const record = result?.getSTS() ?? null;
+			return record;
 		}
 
 		return null;

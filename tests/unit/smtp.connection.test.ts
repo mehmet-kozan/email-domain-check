@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const IS_SMTP_PORT_OPEN = process.env.IS_SERVER;
 
-describe('general test default export', () => {
+describe('getSmtpConnection', () => {
 	const checker = new DomainChecker();
 
 	it('returns true for valid domain', { timeout: 60000 }, async () => {

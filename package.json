@@ -1,6 +1,6 @@
 {
 	"name": "email-domain-check",
-	"version": "2.0.4",
+	"version": "2.0.5",
 	"description": "Comprehensive email domain validation library with DNS, MX, SMTP, DKIM, DMARC and MTA-STS support.",
 	"type": "module",
 	"main": "dist/cjs/index.js",
@@ -32,18 +32,6 @@
 		"email-checker",
 		"email-validator"
 	],
-	"devDependencies": {
-		"@biomejs/biome": "^2.3.7",
-		"@types/node": "^20.6.2",
-		"@vitest/ui": "^4.0.13",
-		"cpy-cli": "^6.0.0",
-		"dkim-key": "^2.0.0",
-		"dmarc-solution": "^1.2.5",
-		"parse-spf": "^1.0.1-1",
-		"rimraf": "^5.0.1",
-		"typescript": "^5.4.2",
-		"vitest": "^4.0.13"
-	},
 	"scripts": {
 		"test": "vitest run",
 		"build:esm": "tsc -p tsconfig.esm.json",
@@ -55,6 +43,22 @@
 		"format": "biome format --write .",
 		"format:all": "biome check --write .",
 		"format:check": "biome check ."
+	},
+	"dependencies": {
+		"tldts": "^7.0.19"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.7",
+		"@types/node": "^24.10.1",
+		"vitest": "^4.0.14",
+		"@vitest/ui": "^4.0.14",
+		"cpy-cli": "^6.0.0",
+		"dkim-key": "^2.0.0",
+		"dmarc-solution": "^1.2.5",
+		"parse-spf": "^1.0.1-1",
+		"rimraf": "^6.1.2",
+		"tsx": "^4.20.6",
+		"typescript": "^5.9.3"
 	},
 	"homepage": "https://github.com/mehmet-kozan/email-domain-check",
 	"bugs": {
@@ -71,8 +75,5 @@
 	"license": "MIT",
 	"engines": {
 		"node": ">=18"
-	},
-	"dependencies": {
-		"tldts": "^7.0.19"
 	}
 }
