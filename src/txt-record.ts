@@ -1,16 +1,26 @@
 export enum RecordKind {
 	Custom = 0,
-	SPF1 = 1,
-	DKIM1 = 2,
-	DMARC1 = 3,
-	STSv1 = 4,
-	CustomKV = 5,
+	CustomKV = 1,
+	SPF1 = 2,
+	DKIM1 = 3,
+	DMARC1 = 4,
+	STSv1 = 5,
+	BIMI1 = 6,
 }
 
 export interface CustomRecord {
 	raw: string;
 	errors: string[];
 	value: string;
+}
+
+export interface BIMIRecord {
+	raw: string;
+	errors: string[];
+	v: string;
+	l?: string; // location (logo url)
+	a?: string; // authority (certificate url)
+	[key: string]: string | string[] | undefined;
 }
 
 export interface SPF1Record {
@@ -88,6 +98,24 @@ export class TXTResult {
 				result = result ?? [];
 				result.push(record.parsed as CustomRecord);
 			}
+		}
+
+		return result;
+	}
+
+	public getBIMI(): BIMIRecord | null {
+		let result: BIMIRecord | null = null;
+		let count = 0;
+
+		for (const record of this.records) {
+			if (record.kind === RecordKind.BIMI1) {
+				count++;
+				result = record.parsed as BIMIRecord;
+			}
+		}
+
+		if (count > 1 && result !== null) {
+			result.errors.push(`Multiple BIMI records.`);
 		}
 
 		return result;
@@ -205,7 +233,7 @@ export class TXTResult {
 export class TXTRecord {
 	public raw: string;
 	public kind: RecordKind;
-	public parsed: CustomRecord | SPF1Record | DMARC1Record | DKIM1Record | STSv1Record | CustomKVRecord | null = null;
+	public parsed: CustomRecord | SPF1Record | DMARC1Record | DKIM1Record | STSv1Record | CustomKVRecord | BIMIRecord | null = null;
 
 	constructor(raw: string) {
 		this.raw = raw;
@@ -218,6 +246,13 @@ export class TXTRecord {
 		if (this.raw.startsWith('v=spf1')) {
 			this.kind = RecordKind.SPF1;
 			this.parsed = this.parseSPF1(this.raw);
+			return;
+		}
+
+		// Check for BIMI record
+		if (this.raw.startsWith('v=BIMI1')) {
+			this.kind = RecordKind.BIMI1;
+			this.parsed = this.parseBIMI1(this.raw);
 			return;
 		}
 
@@ -320,6 +355,39 @@ export class TXTRecord {
 		}
 
 		return spf;
+	}
+
+	public parseBIMI1(raw: string): BIMIRecord {
+		const bimi: BIMIRecord = {
+			raw: raw,
+			errors: [],
+			v: 'BIMI1',
+		};
+
+		const parts = raw
+			.split(';')
+			.map((p) => p.trim())
+			.filter((p) => p);
+
+		for (const part of parts) {
+			const [key, value] = part.split('=').map((s) => s.trim());
+			if (!key || !value) continue;
+
+			switch (key.toLowerCase()) {
+				case 'v':
+					bimi.v = value;
+					break;
+				case 'l':
+					bimi.l = value; // Logo URL
+					break;
+				case 'a':
+					bimi.a = value; // Authority Evidence (VMC URL)
+					break;
+				default:
+					bimi[key] = value;
+			}
+		}
+		return bimi;
 	}
 
 	public parseDMARC1(raw: string): DMARC1Record {

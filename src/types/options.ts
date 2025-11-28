@@ -76,4 +76,5 @@ export interface ResolveOptions {
 	useCache?: boolean;
 	preferDomainNS?: boolean;
 	dkimSelector?: string;
+	bimiSelector?: string;
 }

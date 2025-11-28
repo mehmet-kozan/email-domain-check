@@ -4,7 +4,7 @@ import tldts from 'tldts';
 import { Address, IPKind, type Target } from './address.js';
 import { getMtaStsPolicy, isMxAllowed } from './mta-sts.js';
 import { DNSResolver, ResolverKind } from './resolver.js';
-import type { CustomKVRecord, CustomRecord, DKIM1Record, DMARC1Record, SPF1Record, STSv1Record } from './txt-record.js';
+import type { BIMIRecord, CustomKVRecord, CustomRecord, DKIM1Record, DMARC1Record, SPF1Record, STSv1Record } from './txt-record.js';
 import { TXTRecord, TXTResult } from './txt-record.js';
 import { DNS_ERRORS } from './types/error.js';
 import type { DomainCheckerOptions, ResolveOptions, SafeDCOptions } from './types/options.js';
@@ -396,6 +396,28 @@ export class DomainChecker {
 			opts.target = mtaStsAddr;
 			const result = await this.getTxtRecord(opts);
 			const record = result?.getSTS() ?? null;
+			return record;
+		}
+
+		return null;
+	}
+
+	private get_bimi_addr(addr: Address, selector: string = 'default'): Address | null {
+		if (addr.ipKind === IPKind.None && addr.hostname) {
+			return new Address(`${selector}._bimi.${addr.hostname}`);
+		}
+		return null;
+	}
+
+	public async getBimiRecord(resolveOptions: ResolveOptions): Promise<BIMIRecord | null> {
+		const addr = Address.loadFromTarget(resolveOptions.target);
+		const bimiAddr = this.get_bimi_addr(addr, resolveOptions.bimiSelector);
+
+		if (bimiAddr) {
+			const opts = { ...resolveOptions };
+			opts.target = bimiAddr;
+			const result = await this.getTxtRecord(opts);
+			const record = result?.getBIMI() ?? null;
 			return record;
 		}
 
