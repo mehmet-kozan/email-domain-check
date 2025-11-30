@@ -23,8 +23,8 @@ export class DKIMRecord extends TXTRecord {
 
 			switch (key.toLowerCase()) {
 				case 'v':
-					this.v = value;
-					if (this.v === 'DKIM1') {
+					this.v = value.toLowerCase();
+					if (this.v === 'dkim1') {
 						this.kind = TXTRecordKind.DKIM1;
 					}
 					break;

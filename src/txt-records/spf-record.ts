@@ -18,15 +18,11 @@ export class SPFRecord extends TXTRecord {
 	public parse(raw: string): this {
 		this.raw = raw;
 
-		if (raw.length < 8) {
-			this.errors.push('Raw record empty.');
-		}
-
 		const parts = raw.split(/\s+/);
 
 		for (const part of parts) {
 			if (part.startsWith('v=')) {
-				this.v = part.substring(2);
+				this.v = part.substring(2).toLowerCase();
 				if (this.v === 'spf1') {
 					this.kind = TXTRecordKind.SPF1;
 				}

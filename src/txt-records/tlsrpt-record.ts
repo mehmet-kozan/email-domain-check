@@ -1,8 +1,8 @@
 import { TXTRecord, TXTRecordKind } from './txt-record.js';
 
-export class STSRecord extends TXTRecord {
-	v = 'STSv1';
-	id = '';
+export class TLSRPTRecord extends TXTRecord {
+	v = 'TLSRPTv1';
+	rua = '';
 
 	public parse(raw: string): this {
 		this.raw = raw;
@@ -18,13 +18,13 @@ export class STSRecord extends TXTRecord {
 
 			switch (key.toLowerCase()) {
 				case 'v':
-					this.v = value.toLowerCase(); // STSv1
-					if (this.v === 'stsv1') {
-						this.kind = TXTRecordKind.STSv1;
+					this.v = value.toLowerCase();
+					if (this.v === 'tlsrptv1') {
+						this.kind = TXTRecordKind.TLSRPTv1;
 					}
 					break;
-				case 'id':
-					this.id = value; // unique identifier (timestamp/version)
+				case 'rua':
+					this.rua = value; // Reporting URI(s)
 					break;
 				default:
 					this[key] = value;
@@ -36,9 +36,9 @@ export class STSRecord extends TXTRecord {
 	public toString(): string {
 		const parts: string[] = [`v=${this.v}`];
 
-		if (this.id) parts.push(`id=${this.id}`);
+		if (this.rua) parts.push(`rua=${this.rua}`);
 
-		const knownKeys = ['raw', 'errors', 'v', 'id'];
+		const knownKeys = ['raw', 'errors', 'v', 'rua', 'kind'];
 
 		for (const key of Object.keys(this)) {
 			if (knownKeys.includes(key)) continue;

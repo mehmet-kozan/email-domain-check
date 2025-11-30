@@ -7,6 +7,7 @@ export enum TXTRecordKind {
 	DMARC1 = 40,
 	STSv1 = 50,
 	BIMI1 = 60,
+	TLSRPTv1 = 70,
 }
 
 export abstract class TXTRecord {

@@ -27,8 +27,8 @@ export class DMARCRecord extends TXTRecord {
 
 			switch (key.toLowerCase()) {
 				case 'v':
-					this.v = value;
-					if (this.v === 'DMARC1') {
+					this.v = value.toLowerCase();
+					if (this.v === 'dmarc1') {
 						this.kind = TXTRecordKind.DMARC1;
 					}
 					break;
