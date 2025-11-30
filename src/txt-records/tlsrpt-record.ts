@@ -4,13 +4,12 @@ export class TLSRPTRecord extends TXTRecord {
 	v = 'TLSRPTv1';
 	rua = '';
 
-	constructor(raw?: string) {
-		super(raw);
+	constructor(raw: string, domain?: string) {
+		super(raw, domain);
+
 		// Class field initializers run after super(), overwriting values set by parse() called in super().
 		// We must re-parse to restore the values if raw was provided.
-		if (raw) {
-			this.parse(raw);
-		}
+		this.parse(raw);
 	}
 
 	public parse(raw: string): this {

@@ -11,11 +11,13 @@ import { TXTRecord, TXTRecordKind } from './txt-record.js';
 export { BIMIRecord, KVRecord, CustomRecord, DKIMRecord, SPFRecord, STSRecord, TXTRecord, TXTRecordKind, TLSRPTRecord, DMARCRecord };
 
 export class TXTQueryResult {
+	domain?: string;
 	rawRecords: string[];
 	dnsRecords: TXTRecord[] = [];
 	public errors: string[] = [];
 
-	constructor(chunks: string[][]) {
+	constructor(chunks: string[][], domain?: string) {
+		this.domain = domain;
 		this.rawRecords = chunks.flat();
 		this.parse(this.rawRecords);
 		this.check();
@@ -70,8 +72,7 @@ export class TXTQueryResult {
 	}
 
 	public isValid(): boolean {
-		const hasRecordErrors = this.dnsRecords.some((r) => !r.isValid());
-		return this.errors.length === 0 && !hasRecordErrors;
+		return this.errors.length === 0;
 	}
 
 	public getCustomRecords(): CustomRecord[] | null {
@@ -129,54 +130,54 @@ export class TXTQueryResult {
 			const upperRecord = rawRecord.toUpperCase();
 
 			if (upperRecord.startsWith('V=SPF')) {
-				const record = new SPFRecord(rawRecord);
+				const record = new SPFRecord(rawRecord, this.domain);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Check for BIMI record
 			if (upperRecord.startsWith('V=BIMI')) {
-				const record = new BIMIRecord(rawRecord);
+				const record = new BIMIRecord(rawRecord, this.domain);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Check for DMARC record
 			if (upperRecord.startsWith('V=DMARC')) {
-				const record = new DMARCRecord(rawRecord);
+				const record = new DMARCRecord(rawRecord, this.domain);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Check for MTA-STS record
 			if (upperRecord.startsWith('V=STS')) {
-				const record = new STSRecord(rawRecord);
+				const record = new STSRecord(rawRecord, this.domain);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Check for TLSRPT record
 			if (upperRecord.startsWith('V=TLSRPT')) {
-				const record = new TLSRPTRecord(rawRecord);
+				const record = new TLSRPTRecord(rawRecord, this.domain);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Check for DKIM record
 			if (upperRecord.includes('P=') && (upperRecord.startsWith('V=DKIM') || upperRecord.includes('K='))) {
-				const record = new DKIMRecord(rawRecord);
+				const record = new DKIMRecord(rawRecord, this.domain);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Custom KV record key=value
 			if (KV_REGEX.test(rawRecord)) {
-				const record = new KVRecord(rawRecord);
+				const record = new KVRecord(rawRecord, this.domain);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
-			const record = new CustomRecord(rawRecord);
+			const record = new CustomRecord(rawRecord, this.domain);
 			this.dnsRecords.push(record);
 		}
 	}

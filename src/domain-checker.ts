@@ -7,17 +7,8 @@ import { getMtaStsPolicy, isMxAllowed } from './mta-sts.js';
 import type { DomainCheckerOptions, ResolveOptions, SafeDCOptions } from './options.js';
 import { setSafeDCOptions } from './options.js';
 import { DNSResolver, ResolverKind } from './resolver.js';
-import {
-	type BIMIRecord,
-	type CustomRecord,
-	type DKIMRecord,
-	type DMARCRecord,
-	type KVRecord,
-	type SPFRecord,
-	type STSRecord,
-	type TLSRPTRecord,
-	TXTQueryResult,
-} from './txt-records/index.js';
+import type { BIMIRecord, CustomRecord, DKIMRecord, DMARCRecord, KVRecord, SPFRecord, STSRecord, TLSRPTRecord } from './txt-records/index.js';
+import { TXTQueryResult } from './txt-records/index.js';
 
 export type { MxRecord, Socket, DomainCheckerOptions, ResolveOptions };
 
@@ -491,7 +482,7 @@ export class DomainChecker {
 			resolver = await this.getNsResolver(resolveOptions.target);
 		}
 		const txtRecords = await resolver.resolveTxt(resolveOptions.target.hostname);
-		const result = new TXTQueryResult(txtRecords);
+		const result = new TXTQueryResult(txtRecords, resolveOptions.target.hostname);
 
 		return result;
 	}

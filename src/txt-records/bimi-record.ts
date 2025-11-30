@@ -1,17 +1,23 @@
 import { TXTRecord, TXTRecordKind } from './txt-record.js';
 
+interface BimiData {
+	locationPath?: string;
+	authorityPath?: string;
+	locationData: Buffer<ArrayBuffer> | null;
+	authorityData: Buffer<ArrayBuffer> | null;
+}
+
 export class BIMIRecord extends TXTRecord {
 	v?: string;
 	l?: string; // location (logo url)
 	a?: string; // authority (certificate url)
 
-	constructor(raw?: string) {
-		super(raw);
+	constructor(raw: string, domain?: string) {
+		super(raw, domain);
+
 		// Class field initializers run after super(), overwriting values set by parse() called in super().
 		// We must re-parse to restore the values if raw was provided.
-		if (raw) {
-			this.parse(raw);
-		}
+		this.parse(raw);
 	}
 
 	public parse(raw: string): this {
@@ -67,5 +73,35 @@ export class BIMIRecord extends TXTRecord {
 		}
 
 		return parts.join('; ');
+	}
+
+	public override async isValid(): Promise<boolean> {
+		if (!(await super.isValid())) return false;
+		if (!this.v || !this.l) {
+			this.errors.push(`required field empty.`);
+			return false;
+		}
+
+		const data = await this.downloadBimi();
+		if (data.locationData === null) {
+			this.errors.push(`required data empty.`);
+			return false;
+		}
+
+		if (this.a && data.authorityData === null) {
+			this.errors.push(`required data empty.`);
+			return false;
+		}
+
+		return true;
+	}
+
+	public async downloadBimi(): Promise<BimiData> {
+		return {
+			locationPath: this.l,
+			authorityPath: this.a,
+			locationData: await this.downloadBuffer(this.l),
+			authorityData: await this.downloadBuffer(this.a),
+		};
 	}
 }

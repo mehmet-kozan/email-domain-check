@@ -11,5 +11,8 @@ describe('getDkimRecord', () => {
 		expect(result).not.toBeNull();
 		expect(result).toHaveProperty('raw');
 		expect(typeof result?.raw).toBe('string');
+
+		const res = await result?.downloadBimi();
+		debugger;
 	});
 });
