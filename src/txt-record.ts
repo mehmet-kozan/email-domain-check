@@ -1,11 +1,11 @@
 export enum RecordKind {
 	Custom = 0,
 	CustomKV = 1,
-	SPF1 = 2,
-	DKIM1 = 3,
-	DMARC1 = 4,
-	STSv1 = 5,
-	BIMI1 = 6,
+	SPF1 = 20,
+	DKIM1 = 30,
+	DMARC1 = 40,
+	STSv1 = 50,
+	BIMI1 = 60,
 }
 
 export interface CustomRecord {
