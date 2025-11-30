@@ -1,3 +1,4 @@
+import forge from 'node-forge';
 import { TXTRecord, TXTRecordKind } from './txt-record.js';
 
 interface BimiData {
@@ -5,6 +6,8 @@ interface BimiData {
 	authorityPath?: string;
 	locationData: Buffer<ArrayBuffer> | null;
 	authorityData: Buffer<ArrayBuffer> | null;
+	svgContent?: string;
+	pemContent?: string;
 }
 
 export class BIMIRecord extends TXTRecord {
@@ -89,8 +92,7 @@ export class BIMIRecord extends TXTRecord {
 		}
 
 		// Validate SVG content
-		const svgContent = data.locationData.toString('utf-8');
-		if (!svgContent.includes('<svg') || !svgContent.includes('http://www.w3.org/2000/svg')) {
+		if (!data.svgContent?.includes('<svg') || !data.svgContent?.includes('http://www.w3.org/2000/svg')) {
 			this.errors.push('BIMI location does not contain a valid SVG document with the required XML namespace.');
 			return false;
 		}
@@ -100,15 +102,177 @@ export class BIMIRecord extends TXTRecord {
 			return false;
 		}
 
+		if (data.authorityData) {
+			if (data.pemContent?.includes('-----BEGIN CERTIFICATE-----')) {
+				try {
+					const cert = forge.pki.certificateFromPem(data.pemContent);
+					const now = new Date();
+
+					// Check validity period
+					if (now < cert.validity.notBefore || now > cert.validity.notAfter) {
+						this.errors.push(`BIMI VMC certificate is expired or not yet valid. Valid from: ${cert.validity.notBefore} to ${cert.validity.notAfter}`);
+						return false;
+					}
+
+					// Check for Verified Mark Extension (OID: 1.3.6.1.5.5.7.1.12)
+					// This is a simplified check to see if the extension exists.
+					// A full validation would require parsing the ASN.1 structure of the extension.
+					const vmcExtensionOid = '1.3.6.1.5.5.7.1.12';
+
+					// Try to find the extension manually in the extensions array
+					// node-forge's getExtension might fail if the OID is not registered in its internal map
+					const vmcExtension = cert.extensions.find((ext) => ext.id === vmcExtensionOid);
+
+					if (!vmcExtension) {
+						this.errors.push('Certificate is missing the Verified Mark Extension (OID: 1.3.6.1.5.5.7.1.12), so it is not a valid VMC.');
+						return false;
+					}
+
+					// Parse ASN.1 structure of the extension
+					try {
+						// The value is usually a DER encoded string
+						const asn1 = forge.asn1.fromDer(vmcExtension.value);
+
+						// Basic check: The Logotype Extension should be a SEQUENCE
+						if (asn1.type !== forge.asn1.Type.SEQUENCE) {
+							this.errors.push('VMC extension is not a valid ASN.1 SEQUENCE.');
+							return false;
+						}
+
+						if (!Array.isArray(asn1.value)) {
+							this.errors.push('VMC extension value is not a constructed type.');
+							return false;
+						}
+						const asn1Value = asn1.value as forge.asn1.Asn1[];
+
+						// Further validation of the Logotype structure (RFC 3709)
+						// LogotypeExtn ::= SEQUENCE { ..., subjectLogo [2] EXPLICIT LogotypeInfo OPTIONAL, ... }
+						const subjectLogo = asn1Value.find((val: forge.asn1.Asn1) => val.tagClass === forge.asn1.Class.CONTEXT_SPECIFIC && val.type === 2);
+
+						if (!subjectLogo) {
+							this.errors.push('VMC extension does not contain a subjectLogo (tag [2]).');
+							return false;
+						}
+
+						// subjectLogo is EXPLICIT, so it contains the LogotypeInfo
+						// LogotypeInfo ::= CHOICE { direct [0] LogotypeData, indirect [1] LogotypeReference }
+						if (!subjectLogo.value || !Array.isArray(subjectLogo.value) || subjectLogo.value.length === 0) {
+							this.errors.push('subjectLogo is empty or invalid.');
+							return false;
+						}
+
+						const logotypeInfo = (subjectLogo.value as forge.asn1.Asn1[])[0];
+
+						// We expect direct [0] for VMC usually
+						if (logotypeInfo.tagClass !== forge.asn1.Class.CONTEXT_SPECIFIC || logotypeInfo.type !== 0) {
+							this.errors.push('subjectLogo must be of type direct (tag [0]).');
+							return false;
+						}
+
+						// direct [0] contains LogotypeData
+						// LogotypeData ::= SEQUENCE { image SEQUENCE OF LogotypeImage OPTIONAL, ... }
+						if (!logotypeInfo.value || !Array.isArray(logotypeInfo.value) || logotypeInfo.value.length === 0) {
+							this.errors.push('LogotypeData is empty or invalid.');
+							return false;
+						}
+
+						const logotypeData = (logotypeInfo.value as forge.asn1.Asn1[])[0];
+						if (logotypeData.type !== forge.asn1.Type.SEQUENCE) {
+							this.errors.push('LogotypeData must be a SEQUENCE.');
+							return false;
+						}
+
+						if (!Array.isArray(logotypeData.value)) {
+							this.errors.push('LogotypeData value is not a constructed type.');
+							return false;
+						}
+						const logotypeDataValue = logotypeData.value as forge.asn1.Asn1[];
+
+						// Find 'image' sequence in LogotypeData
+						// It is a SEQUENCE OF LogotypeImage.
+						const imageSeq = logotypeDataValue.find((val: forge.asn1.Asn1) => val.type === forge.asn1.Type.SEQUENCE);
+
+						if (!imageSeq) {
+							this.errors.push('LogotypeData does not contain an image sequence.');
+							return false;
+						}
+
+						if (!Array.isArray(imageSeq.value)) {
+							this.errors.push('Image sequence value is not a constructed type.');
+							return false;
+						}
+						const imageSeqValue = imageSeq.value as forge.asn1.Asn1[];
+
+						// Iterate over LogotypeImages
+						// LogotypeImage ::= SEQUENCE { imageDetails LogotypeDetails, ... }
+						let hasSvg = false;
+						for (const logotypeImage of imageSeqValue) {
+							if (logotypeImage.type !== forge.asn1.Type.SEQUENCE) continue;
+							if (!Array.isArray(logotypeImage.value)) continue;
+
+							const logotypeImageValue = logotypeImage.value as forge.asn1.Asn1[];
+							if (logotypeImageValue.length === 0) continue;
+
+							// Check if the first element is LogotypeDetails (SEQUENCE) or mediaType (IA5String)
+							const firstElement = logotypeImageValue[0];
+							let mediaType: forge.asn1.Asn1 | undefined;
+
+							if (firstElement.type === forge.asn1.Type.SEQUENCE) {
+								// Standard RFC 3709: LogotypeImage contains LogotypeDetails as first element
+								if (Array.isArray(firstElement.value) && firstElement.value.length > 0) {
+									mediaType = (firstElement.value as forge.asn1.Asn1[])[0];
+								}
+							} else if (firstElement.type === forge.asn1.Type.IA5STRING) {
+								// Observed structure where LogotypeImage seems to be LogotypeDetails directly
+								mediaType = firstElement;
+							}
+
+							if (mediaType && mediaType.type === forge.asn1.Type.IA5STRING) {
+								if (mediaType.value === 'image/svg+xml') {
+									hasSvg = true;
+									break;
+								}
+							}
+						}
+
+						if (!hasSvg) {
+							this.errors.push('VMC subjectLogo does not contain an entry with mediaType "image/svg+xml".');
+							return false;
+						}
+					} catch (e) {
+						this.errors.push(`Failed to parse VMC extension ASN.1: ${(e as Error).message}`);
+						return false;
+					}
+
+					return true;
+				} catch (error) {
+					this.errors.push(`Invalid BIMI VMC certificate: ${(error as Error).message}`);
+					return false;
+				}
+			}
+			this.errors.push('BIMI authority evidence (VMC) is not a valid PEM certificate.');
+			return false;
+		}
+
 		return true;
 	}
 
 	public async downloadBimi(): Promise<BimiData> {
-		return {
+		const result: BimiData = {
 			locationPath: this.l,
 			authorityPath: this.a,
 			locationData: await this.downloadBuffer(this.l),
 			authorityData: await this.downloadBuffer(this.a),
 		};
+
+		if (result.locationData) {
+			result.svgContent = result.locationData.toString('utf-8');
+		}
+
+		if (result.authorityData) {
+			result.pemContent = result.authorityData.toString('utf-8');
+		}
+
+		return result;
 	}
 }

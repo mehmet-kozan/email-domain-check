@@ -12,7 +12,7 @@ describe('getDkimRecord', () => {
 		expect(result).toHaveProperty('raw');
 		expect(typeof result?.raw).toBe('string');
 
-		const res = await result?.downloadBimi();
+		const res = await result?.isValid();
 		debugger;
 	});
 });
