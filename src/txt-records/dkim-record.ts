@@ -9,9 +9,16 @@ export class DKIMRecord extends TXTRecord {
 	t?: string[];
 	n?: string;
 
-	public parse(raw: string): this {
-		this.raw = raw;
+	constructor(raw?: string) {
+		super(raw);
+		// Class field initializers run after super(), overwriting values set by parse() called in super().
+		// We must re-parse to restore the values if raw was provided.
+		if (raw) {
+			this.parse(raw);
+		}
+	}
 
+	public parse(raw: string): this {
 		const parts = raw
 			.split(';')
 			.map((p) => p.trim())
@@ -23,8 +30,8 @@ export class DKIMRecord extends TXTRecord {
 
 			switch (key.toLowerCase()) {
 				case 'v':
-					this.v = value.toLowerCase();
-					if (this.v === 'dkim1') {
+					this.v = value;
+					if (this.v.toUpperCase() === 'DKIM1') {
 						this.kind = TXTRecordKind.DKIM1;
 					}
 					break;
@@ -64,7 +71,7 @@ export class DKIMRecord extends TXTRecord {
 		if (this.t && this.t.length > 0) parts.push(`t=${this.t.join(':')}`);
 		if (this.n) parts.push(`n=${this.n}`);
 
-		const knownKeys = ['raw', 'errors', 'v', 'k', 'p', 'h', 's', 't', 'n'];
+		const knownKeys = [...this.knownKeys, 'v', 'k', 'p', 'h', 's', 't', 'n'];
 
 		for (const key of Object.keys(this)) {
 			if (knownKeys.includes(key)) continue;

@@ -4,9 +4,16 @@ export class STSRecord extends TXTRecord {
 	v = 'STSv1';
 	id = '';
 
-	public parse(raw: string): this {
-		this.raw = raw;
+	constructor(raw?: string) {
+		super(raw);
+		// Class field initializers run after super(), overwriting values set by parse() called in super().
+		// We must re-parse to restore the values if raw was provided.
+		if (raw) {
+			this.parse(raw);
+		}
+	}
 
+	public parse(raw: string): this {
 		const parts = raw
 			.split(';')
 			.map((p) => p.trim())
@@ -18,8 +25,8 @@ export class STSRecord extends TXTRecord {
 
 			switch (key.toLowerCase()) {
 				case 'v':
-					this.v = value.toLowerCase(); // STSv1
-					if (this.v === 'stsv1') {
+					this.v = value; // STSv1
+					if (this.v.toUpperCase() === 'STSV1') {
 						this.kind = TXTRecordKind.STSv1;
 					}
 					break;
@@ -38,7 +45,7 @@ export class STSRecord extends TXTRecord {
 
 		if (this.id) parts.push(`id=${this.id}`);
 
-		const knownKeys = ['raw', 'errors', 'v', 'id'];
+		const knownKeys = [...this.knownKeys, 'v', 'id'];
 
 		for (const key of Object.keys(this)) {
 			if (knownKeys.includes(key)) continue;

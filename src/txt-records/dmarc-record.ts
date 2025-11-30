@@ -13,9 +13,16 @@ export class DMARCRecord extends TXTRecord {
 	pct?: number;
 	rf?: string;
 
-	public parse(raw: string): this {
-		this.raw = raw;
+	constructor(raw?: string) {
+		super(raw);
+		// Class field initializers run after super(), overwriting values set by parse() called in super().
+		// We must re-parse to restore the values if raw was provided.
+		if (raw) {
+			this.parse(raw);
+		}
+	}
 
+	public parse(raw: string): this {
 		const parts = raw
 			.split(';')
 			.map((p) => p.trim())
@@ -27,8 +34,8 @@ export class DMARCRecord extends TXTRecord {
 
 			switch (key.toLowerCase()) {
 				case 'v':
-					this.v = value.toLowerCase();
-					if (this.v === 'dmarc1') {
+					this.v = value;
+					if (this.v.toUpperCase() === 'DMARC1') {
 						this.kind = TXTRecordKind.DMARC1;
 					}
 					break;
@@ -83,7 +90,7 @@ export class DMARCRecord extends TXTRecord {
 		if (this.pct !== undefined) parts.push(`pct=${this.pct}`);
 		if (this.rf) parts.push(`rf=${this.rf}`);
 
-		const knownKeys = ['raw', 'errors', 'v', 'p', 'sp', 'rua', 'ruf', 'adkim', 'aspf', 'ri', 'fo', 'pct', 'rf'];
+		const knownKeys = [...this.knownKeys, 'v', 'p', 'sp', 'rua', 'ruf', 'adkim', 'aspf', 'ri', 'fo', 'pct', 'rf'];
 
 		for (const key of Object.keys(this)) {
 			if (knownKeys.includes(key)) continue;

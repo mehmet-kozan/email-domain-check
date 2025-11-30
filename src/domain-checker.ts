@@ -2,9 +2,11 @@ import type { MxRecord } from 'node:dns';
 import { createConnection, type Socket } from 'node:net';
 import tldts from 'tldts';
 import { Address, IPKind, type Target } from './address.js';
+import { DNS_ERRORS } from './error.js';
 import { getMtaStsPolicy, isMxAllowed } from './mta-sts.js';
+import type { DomainCheckerOptions, ResolveOptions, SafeDCOptions } from './options.js';
+import { setSafeDCOptions } from './options.js';
 import { DNSResolver, ResolverKind } from './resolver.js';
-
 import {
 	type BIMIRecord,
 	type CustomRecord,
@@ -16,9 +18,6 @@ import {
 	type TLSRPTRecord,
 	TXTQueryResult,
 } from './txt-records/index.js';
-import { DNS_ERRORS } from './types/error.js';
-import type { DomainCheckerOptions, ResolveOptions, SafeDCOptions } from './types/options.js';
-import { setSafeDCOptions } from './types/options.js';
 
 export type { MxRecord, Socket, DomainCheckerOptions, ResolveOptions };
 
@@ -326,7 +325,7 @@ export class DomainChecker {
 		return record;
 	}
 
-	public async getCustomKVRecord(resolveOptions: ResolveOptions, key: string): Promise<KVRecord | null> {
+	public async getSingleKVRecord(resolveOptions: ResolveOptions, key: string): Promise<KVRecord | null> {
 		const result = await this.getTxtRecord(resolveOptions);
 		const record = result?.getSingleKVRecord(key) ?? null;
 		return record;

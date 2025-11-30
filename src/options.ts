@@ -1,4 +1,4 @@
-import type { Target } from '../address.js';
+import type { Target } from './address.js';
 
 /**
  * Options for DomainChecker behavior.

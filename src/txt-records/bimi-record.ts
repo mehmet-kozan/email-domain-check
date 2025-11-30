@@ -5,9 +5,16 @@ export class BIMIRecord extends TXTRecord {
 	l?: string; // location (logo url)
 	a?: string; // authority (certificate url)
 
-	public parse(raw: string): this {
-		this.raw = raw;
+	constructor(raw?: string) {
+		super(raw);
+		// Class field initializers run after super(), overwriting values set by parse() called in super().
+		// We must re-parse to restore the values if raw was provided.
+		if (raw) {
+			this.parse(raw);
+		}
+	}
 
+	public parse(raw: string): this {
 		const parts = raw
 			.split(';')
 			.map((p) => p.trim())
@@ -19,9 +26,9 @@ export class BIMIRecord extends TXTRecord {
 
 			switch (key.toLowerCase()) {
 				case 'v':
-					this.v = value.toLowerCase();
-					if (this.v === 'bimi1') {
-						this.kind === TXTRecordKind.BIMI1;
+					this.v = value;
+					if (this.v.toUpperCase() === 'BIMI1') {
+						this.kind = TXTRecordKind.BIMI1;
 					}
 					break;
 				case 'l':
@@ -44,7 +51,7 @@ export class BIMIRecord extends TXTRecord {
 		if (this.l) parts.push(`l=${this.l}`);
 		if (this.a) parts.push(`a=${this.a}`);
 
-		const knownKeys = ['raw', 'errors', 'v', 'l', 'a'];
+		const knownKeys = [...this.knownKeys, 'v', 'l', 'a'];
 
 		for (const key of Object.keys(this)) {
 			if (knownKeys.includes(key)) continue;

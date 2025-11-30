@@ -36,11 +36,12 @@
 		"build:esm": "tsc -p tsconfig.esm.json",
 		"build:cjs": "tsc -p tsconfig.cjs.json",
 		"build": "npm run clean && npm run build:esm && npm run build:cjs",
-		"postbuild": "cpy  ./package.cjs.json ./dist/cjs/ --rename=package.json",
+		"postbuild": "cpy  ./configs/package.cjs.json ./dist/cjs/ --rename=package.json",
 		"clean": "rimraf dist",
-		"test": "vitest run",
-		"test:package": "vitest run --config vitest.config.package.ts",
-		"test:all": "npm run test && npm run test:package",
+		"test": "vitest run --reporter=default",
+		"test:pkg": "vitest run --config vitest.config.package.ts --reporter=default",
+		"test:exp": "node scripts/example.test.mjs",
+		"test:all": "npm run test && npm run test:pkg && npm run test:exp",
 		"lint": "biome lint .",
 		"format": "biome format --write .",
 		"format:all": "biome check --write .",
@@ -52,7 +53,6 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.3.7",
 		"@types/node": "^24.10.1",
-		"vitest": "^4.0.14",
 		"@vitest/ui": "^4.0.14",
 		"cpy-cli": "^6.0.0",
 		"dkim-key": "^2.0.0",
@@ -60,7 +60,8 @@
 		"parse-spf": "^1.0.1-1",
 		"rimraf": "^6.1.2",
 		"tsx": "^4.20.6",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.14"
 	},
 	"homepage": "https://github.com/mehmet-kozan/email-domain-check",
 	"bugs": {

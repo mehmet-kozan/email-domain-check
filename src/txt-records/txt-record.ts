@@ -13,16 +13,17 @@ export enum TXTRecordKind {
 export abstract class TXTRecord {
 	public raw?: string;
 	public errors: string[] = [];
-	public kind: TXTRecordKind = TXTRecordKind.None;
+	public kind: TXTRecordKind;
 
 	// Index signature to allow dynamic properties (tags) and methods
 	// biome-ignore lint/suspicious/noExplicitAny: <base record type>
 	[key: string]: any;
 
+	protected knownKeys: string[] = ['raw', 'errors', 'kind', 'knownKeys'];
+
 	constructor(raw?: string) {
-		if (raw) {
-			this.parse(raw);
-		}
+		this.raw = raw;
+		this.kind = TXTRecordKind.None;
 	}
 
 	/**

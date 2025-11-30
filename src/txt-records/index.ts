@@ -126,44 +126,44 @@ export class TXTQueryResult {
 			if (!rawRecord) continue;
 
 			// Normalize for case-insensitive checking
-			const lowerRecord = rawRecord.toLowerCase();
+			const upperRecord = rawRecord.toUpperCase();
 
-			if (lowerRecord.startsWith('v=spf')) {
+			if (upperRecord.startsWith('V=SPF')) {
 				const record = new SPFRecord(rawRecord);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Check for BIMI record
-			if (lowerRecord.startsWith('v=bimi')) {
+			if (upperRecord.startsWith('V=BIMI')) {
 				const record = new BIMIRecord(rawRecord);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Check for DMARC record
-			if (lowerRecord.startsWith('v=dmarc')) {
+			if (upperRecord.startsWith('V=DMARC')) {
 				const record = new DMARCRecord(rawRecord);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Check for MTA-STS record
-			if (lowerRecord.startsWith('v=sts')) {
+			if (upperRecord.startsWith('V=STS')) {
 				const record = new STSRecord(rawRecord);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Check for TLSRPT record
-			if (lowerRecord.startsWith('v=tlsrpt')) {
+			if (upperRecord.startsWith('V=TLSRPT')) {
 				const record = new TLSRPTRecord(rawRecord);
 				this.dnsRecords.push(record);
 				continue;
 			}
 
 			// Check for DKIM record
-			if (lowerRecord.includes('p=') && (lowerRecord.startsWith('v=dkim') || lowerRecord.includes('k='))) {
+			if (upperRecord.includes('P=') && (upperRecord.startsWith('V=DKIM') || upperRecord.includes('K='))) {
 				const record = new DKIMRecord(rawRecord);
 				this.dnsRecords.push(record);
 				continue;

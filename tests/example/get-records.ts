@@ -35,7 +35,7 @@ const customRecords = await checker.getCustomRecords({
 console.log('Custom Records:', customRecords);
 
 // Get custom kv record
-const kvRecord = await checker.getCustomKVRecord(
+const kvRecord = await checker.getSingleKVRecord(
 	{
 		target: 'user@gmail.com',
 	},

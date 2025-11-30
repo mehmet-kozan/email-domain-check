@@ -15,15 +15,22 @@ export class SPFRecord extends TXTRecord {
 	'a:domain'?: string;
 	'mx:domain'?: string;
 
-	public parse(raw: string): this {
-		this.raw = raw;
+	constructor(raw?: string) {
+		super(raw);
+		// Class field initializers run after super(), overwriting values set by parse() called in super().
+		// We must re-parse to restore the values if raw was provided.
+		if (raw) {
+			this.parse(raw);
+		}
+	}
 
+	public parse(raw: string): this {
 		const parts = raw.split(/\s+/);
 
 		for (const part of parts) {
 			if (part.startsWith('v=')) {
-				this.v = part.substring(2).toLowerCase();
-				if (this.v === 'spf1') {
+				this.v = part.substring(2);
+				if (this.v.toUpperCase() === 'SPF1') {
 					this.kind = TXTRecordKind.SPF1;
 				}
 				continue;

@@ -4,9 +4,16 @@ export class TLSRPTRecord extends TXTRecord {
 	v = 'TLSRPTv1';
 	rua = '';
 
-	public parse(raw: string): this {
-		this.raw = raw;
+	constructor(raw?: string) {
+		super(raw);
+		// Class field initializers run after super(), overwriting values set by parse() called in super().
+		// We must re-parse to restore the values if raw was provided.
+		if (raw) {
+			this.parse(raw);
+		}
+	}
 
+	public parse(raw: string): this {
 		const parts = raw
 			.split(';')
 			.map((p) => p.trim())
@@ -18,8 +25,8 @@ export class TLSRPTRecord extends TXTRecord {
 
 			switch (key.toLowerCase()) {
 				case 'v':
-					this.v = value.toLowerCase();
-					if (this.v === 'tlsrptv1') {
+					this.v = value;
+					if (this.v.toUpperCase() === 'TLSRPTV1') {
 						this.kind = TXTRecordKind.TLSRPTv1;
 					}
 					break;
@@ -38,7 +45,7 @@ export class TLSRPTRecord extends TXTRecord {
 
 		if (this.rua) parts.push(`rua=${this.rua}`);
 
-		const knownKeys = ['raw', 'errors', 'v', 'rua', 'kind'];
+		const knownKeys = [...this.knownKeys, 'v', 'rua', 'kind'];
 
 		for (const key of Object.keys(this)) {
 			if (knownKeys.includes(key)) continue;
