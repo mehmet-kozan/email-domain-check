@@ -434,6 +434,29 @@ export class DomainChecker {
 		return null;
 	}
 
+	// RFC 8460
+	private get_tls_rpt_addr(addr: Address): Address | null {
+		if (addr.ipKind === IPKind.None && addr.hostname) {
+			return new Address(`_smtp._tls.${addr.hostname}`);
+		}
+		return null;
+	}
+
+	public async getTlsRptRecord(resolveOptions: ResolveOptions): Promise<TLSRPTRecord | null> {
+		const addr = Address.loadFromTarget(resolveOptions.target);
+		const bimiAddr = this.get_tls_rpt_addr(addr);
+
+		if (bimiAddr) {
+			const opts = { ...resolveOptions };
+			opts.target = bimiAddr;
+			const result = await this.getTxtRecord(opts);
+			const record = result?.getTLSRPTRecord() ?? null;
+			return record;
+		}
+
+		return null;
+	}
+
 	public async getTxtRecord(resolveOptions: ResolveOptions): Promise<TXTQueryResult | null> {
 		let lastError: Error;
 		try {

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { getMtaStsPolicy } from 'email-domain-check';
+import { describe, expect, it } from 'vitest';
 
 describe('getMtaStsPolicy', () => {
 	it('returns valid sts policy', async () => {
