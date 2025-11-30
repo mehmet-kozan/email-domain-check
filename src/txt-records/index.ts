@@ -8,7 +8,7 @@ import { STSRecord } from './sts-record.js';
 import { TLSRPTRecord } from './tlsrpt-record.js';
 import { TXTRecord, TXTRecordKind } from './txt-record.js';
 
-export { BIMIRecord, KVRecord, CustomRecord, DKIMRecord, SPFRecord, STSRecord, TXTRecord, TXTRecordKind, TLSRPTRecord };
+export { BIMIRecord, KVRecord, CustomRecord, DKIMRecord, SPFRecord, STSRecord, TXTRecord, TXTRecordKind, TLSRPTRecord, DMARCRecord };
 
 export class TXTQueryResult {
 	rawRecords: string[];

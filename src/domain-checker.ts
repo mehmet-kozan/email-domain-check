@@ -4,8 +4,18 @@ import tldts from 'tldts';
 import { Address, IPKind, type Target } from './address.js';
 import { getMtaStsPolicy, isMxAllowed } from './mta-sts.js';
 import { DNSResolver, ResolverKind } from './resolver.js';
-import type { BIMIRecord, CustomKVRecord, CustomRecord, DKIM1Record, DMARC1Record, SPF1Record, STSv1Record } from './txt-record.js';
-import { TXTRecord, TXTResult } from './txt-record.js';
+
+import {
+	type BIMIRecord,
+	type CustomRecord,
+	type DKIMRecord,
+	type DMARCRecord,
+	type KVRecord,
+	type SPFRecord,
+	type STSRecord,
+	type TLSRPTRecord,
+	TXTQueryResult,
+} from './txt-records/index.js';
 import { DNS_ERRORS } from './types/error.js';
 import type { DomainCheckerOptions, ResolveOptions, SafeDCOptions } from './types/options.js';
 import { setSafeDCOptions } from './types/options.js';
@@ -316,21 +326,21 @@ export class DomainChecker {
 		return record;
 	}
 
-	public async getCustomKVRecord(resolveOptions: ResolveOptions, key: string): Promise<CustomKVRecord | null> {
+	public async getCustomKVRecord(resolveOptions: ResolveOptions, key: string): Promise<KVRecord | null> {
 		const result = await this.getTxtRecord(resolveOptions);
-		const record = result?.getCustomKVRecord(key) ?? null;
+		const record = result?.getSingleKVRecord(key) ?? null;
 		return record;
 	}
 
-	public async getAllKVRecords(resolveOptions: ResolveOptions): Promise<CustomKVRecord[] | null> {
+	public async getAllKVRecords(resolveOptions: ResolveOptions): Promise<KVRecord[] | null> {
 		const result = await this.getTxtRecord(resolveOptions);
-		const record = result?.getAllKVRecord() ?? null;
+		const record = result?.getAllKVRecords() ?? null;
 		return record;
 	}
 
-	public async getSpfRecord(resolveOptions: ResolveOptions): Promise<SPF1Record | null> {
+	public async getSpfRecord(resolveOptions: ResolveOptions): Promise<SPFRecord | null> {
 		const result = await this.getTxtRecord(resolveOptions);
-		const record = result?.getSPF() ?? null;
+		const record = result?.getSpfRecord() ?? null;
 		return record;
 	}
 
@@ -342,7 +352,7 @@ export class DomainChecker {
 		return null;
 	}
 
-	public async getDkimRecord(resolveOptions: ResolveOptions): Promise<DKIM1Record | null> {
+	public async getDkimRecord(resolveOptions: ResolveOptions): Promise<DKIMRecord | null> {
 		const addr = Address.loadFromTarget(resolveOptions.target);
 
 		const dkimAddr = this.get_dkim_addr(addr, resolveOptions.dkimSelector);
@@ -350,7 +360,7 @@ export class DomainChecker {
 		if (dkimAddr) {
 			resolveOptions.target = dkimAddr;
 			const result = await this.getTxtRecord(resolveOptions);
-			const record = result?.getDKIM() ?? null;
+			const record = result?.getDkimRecord() ?? null;
 			return record;
 		}
 
@@ -365,7 +375,7 @@ export class DomainChecker {
 		return null;
 	}
 
-	public async getDmarcRecord(resolveOptions: ResolveOptions): Promise<DMARC1Record | null> {
+	public async getDmarcRecord(resolveOptions: ResolveOptions): Promise<DMARCRecord | null> {
 		const addr = Address.loadFromTarget(resolveOptions.target);
 
 		const dmarcAddr = this.get_dmarc_addr(addr);
@@ -373,7 +383,7 @@ export class DomainChecker {
 		if (dmarcAddr) {
 			resolveOptions.target = dmarcAddr;
 			const result = await this.getTxtRecord(resolveOptions);
-			const record = result?.getDMARC() ?? null;
+			const record = result?.getDmarcRecord() ?? null;
 			return record;
 		}
 
@@ -387,7 +397,7 @@ export class DomainChecker {
 		return null;
 	}
 
-	public async getStsRecord(resolveOptions: ResolveOptions): Promise<STSv1Record | null> {
+	public async getStsRecord(resolveOptions: ResolveOptions): Promise<STSRecord | null> {
 		const addr = Address.loadFromTarget(resolveOptions.target);
 		const mtaStsAddr = this.get_sts_addr(addr);
 
@@ -395,7 +405,7 @@ export class DomainChecker {
 			const opts = { ...resolveOptions };
 			opts.target = mtaStsAddr;
 			const result = await this.getTxtRecord(opts);
-			const record = result?.getSTS() ?? null;
+			const record = result?.getStsRecord() ?? null;
 			return record;
 		}
 
@@ -417,14 +427,14 @@ export class DomainChecker {
 			const opts = { ...resolveOptions };
 			opts.target = bimiAddr;
 			const result = await this.getTxtRecord(opts);
-			const record = result?.getBIMI() ?? null;
+			const record = result?.getBimiRecord() ?? null;
 			return record;
 		}
 
 		return null;
 	}
 
-	public async getTxtRecord(resolveOptions: ResolveOptions): Promise<TXTResult | null> {
+	public async getTxtRecord(resolveOptions: ResolveOptions): Promise<TXTQueryResult | null> {
 		let lastError: Error;
 		try {
 			return await this.getTxtRecordWithFailover(resolveOptions);
@@ -452,22 +462,14 @@ export class DomainChecker {
 		throw lastError;
 	}
 
-	private async getTxtRecordWithFailover(resolveOptions: ResolveOptions, fallback?: DNSResolver): Promise<TXTResult> {
+	private async getTxtRecordWithFailover(resolveOptions: ResolveOptions, fallback?: DNSResolver): Promise<TXTQueryResult> {
 		resolveOptions.target = Address.loadFromTarget(resolveOptions.target);
 		let resolver = fallback ? fallback : this.resolver;
 		if ((this.options.useDomainNS || resolveOptions.preferDomainNS) && !fallback) {
 			resolver = await this.getNsResolver(resolveOptions.target);
 		}
 		const txtRecords = await resolver.resolveTxt(resolveOptions.target.hostname);
-		const flatRecords = txtRecords.flat();
-
-		const result = new TXTResult();
-		for (let flatRecord of flatRecords) {
-			flatRecord = flatRecord?.trim();
-			if (!flatRecord) continue;
-			const record = new TXTRecord(flatRecord);
-			result.records.push(record);
-		}
+		const result = new TXTQueryResult(txtRecords);
 
 		return result;
 	}
