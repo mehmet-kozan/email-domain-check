@@ -78,18 +78,25 @@ export class BIMIRecord extends TXTRecord {
 	public override async isValid(): Promise<boolean> {
 		if (!(await super.isValid())) return false;
 		if (!this.v || !this.l) {
-			this.errors.push(`required field empty.`);
+			this.errors.push('BIMI record is missing required fields: version (v) or location (l).');
 			return false;
 		}
 
 		const data = await this.downloadBimi();
 		if (data.locationData === null) {
-			this.errors.push(`required data empty.`);
+			this.errors.push(`Failed to download BIMI SVG image from: ${this.l}`);
+			return false;
+		}
+
+		// Validate SVG content
+		const svgContent = data.locationData.toString('utf-8');
+		if (!svgContent.includes('<svg') || !svgContent.includes('http://www.w3.org/2000/svg')) {
+			this.errors.push('BIMI location does not contain a valid SVG document with the required XML namespace.');
 			return false;
 		}
 
 		if (this.a && data.authorityData === null) {
-			this.errors.push(`required data empty.`);
+			this.errors.push(`Failed to download BIMI authority evidence (VMC) from: ${this.a}`);
 			return false;
 		}
 
