@@ -3,7 +3,7 @@
 # email-domain-check
 
 **A comprehensive email domain validation library.** 
-**Supports DNS, MX, SMTP, DKIM, DMARC, BIMI, TLSRPT, and MTA-STS.**  
+**Supports DNS, MX, SPF, SMTP, DKIM, DMARC, BIMI, TLSRPT and MTA-STS.**  
 
 </div> 
 
