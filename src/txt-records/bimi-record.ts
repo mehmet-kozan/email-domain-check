@@ -1,7 +1,8 @@
 import forge from 'node-forge';
+import { RootStore } from './bimi-root-store.js';
 import { TXTRecord, TXTRecordKind } from './txt-record.js';
 
-interface BimiData {
+export interface BimiData {
 	locationPath?: string;
 	authorityPath?: string;
 	locationData: Buffer<ArrayBuffer> | null;
@@ -116,16 +117,31 @@ export class BIMIRecord extends TXTRecord {
 		}
 
 		try {
-			const cert = forge.pki.certificateFromPem(pemContent);
+			// 1. PEM içeriğindeki tüm sertifikaları ayıkla (Zincir: Leaf -> Intermediate -> Root)
+			const pemBlocks = pemContent.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g);
+
+			if (!pemBlocks || pemBlocks.length === 0) {
+				this.errors.push('No certificates found in PEM content.');
+				return false;
+			}
+
+			const certs = pemBlocks.map((block) => forge.pki.certificateFromPem(block));
+			const leafCert = certs[0]; // İlk sertifika her zaman asıl VMC (Leaf) sertifikasıdır
+
 			const now = new Date();
 
-			if (now < cert.validity.notBefore || now > cert.validity.notAfter) {
-				this.errors.push(`BIMI VMC certificate is expired or not yet valid. Valid from: ${cert.validity.notBefore} to ${cert.validity.notAfter}`);
+			if (now < leafCert.validity.notBefore || now > leafCert.validity.notAfter) {
+				this.errors.push(`BIMI VMC certificate is expired or not yet valid. Valid from: ${leafCert.validity.notBefore} to ${leafCert.validity.notAfter}`);
+				return false;
+			}
+
+			// 2. İmza Doğrulaması (Signature Validation)
+			if (!this.validateChainSignature(certs)) {
 				return false;
 			}
 
 			const vmcExtensionOid = '1.3.6.1.5.5.7.1.12';
-			const vmcExtension = cert.extensions.find((ext) => ext.id === vmcExtensionOid);
+			const vmcExtension = leafCert.extensions.find((ext) => ext.id === vmcExtensionOid);
 
 			if (!vmcExtension) {
 				this.errors.push('Certificate is missing the Verified Mark Extension (OID: 1.3.6.1.5.5.7.1.12), so it is not a valid VMC.');
@@ -137,6 +153,46 @@ export class BIMIRecord extends TXTRecord {
 			this.errors.push(`Invalid BIMI VMC certificate: ${(error as Error).message}`);
 			return false;
 		}
+	}
+
+	/**
+	 * Sertifika zincirindeki imzaları doğrular.
+	 * Genellikle VMC dosyaları Leaf + Intermediate sertifikalarını içerir.
+	 */
+	private validateChainSignature(certs: forge.pki.Certificate[]): boolean {
+		// RootStore singleton örneğini al
+		const rootStore = RootStore.getInstance();
+
+		// Zinciri doğrula (Leaf -> Intermediate -> ... -> Root)
+		// RootStore, diskteki güvenilir kök sertifikaları kullanarak zincirin güvenilir bir köke ulaşıp ulaşmadığını kontrol eder.
+		const isChainValid = rootStore.verifyChain(certs);
+
+		if (!isChainValid) {
+			// Eğer tam zincir doğrulaması başarısız olursa (örneğin Root CA eksikse),
+			// en azından dosya içindeki zincirin (Leaf -> Intermediate) tutarlı olup olmadığını kontrol edelim.
+			// Bu, "kısmi" bir doğrulamadır ancak hiç yoktan iyidir.
+
+			if (certs.length >= 2) {
+				const leaf = certs[0];
+				const issuer = certs[1];
+				try {
+					const verified = leaf.verify(issuer);
+					if (verified) {
+						this.errors.push('Warning: The certificate chain is internally consistent, but it does not chain up to a trusted Root CA in our store.');
+						// Tam doğrulama başarısız olduğu için false dönüyoruz, ancak yukarıdaki uyarıyı ekliyoruz.
+						// Eğer "self-contained" zincirleri geçerli saymak isterseniz burayı true yapabilirsiniz.
+						return false;
+					}
+				} catch (e) {
+					// yut, asıl hata aşağıda verilecek
+				}
+			}
+
+			this.errors.push('BIMI VMC certificate chain validation failed. The certificate is not trusted by the known Root CAs.');
+			return false;
+		}
+
+		return true;
 	}
 
 	private validateLogotypeExtension(derValue: string): boolean {

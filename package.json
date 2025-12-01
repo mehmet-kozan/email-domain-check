@@ -37,7 +37,7 @@
 		"build:esm": "tsc -p tsconfig.esm.json",
 		"build:cjs": "tsc -p tsconfig.cjs.json",
 		"build": "npm run clean && npm run build:esm && npm run build:cjs",
-		"postbuild": "cpy ./configs/package.cjs.json ./dist/cjs/ --flat --rename=package.json",
+		"postbuild": "cpy ./configs/package.cjs.json ./dist/cjs/ --flat --rename=package.json && cpy ./root-certs ./dist/",
 		"clean": "rimraf dist",
 		"test": "vitest run --reporter=default",
 		"test:pkg": "vitest run --config vitest.config.package.ts --reporter=default",
