@@ -6,7 +6,7 @@ describe('getDmarcRecord', () => {
 
 	it('returns valid dmarc record', async () => {
 		const result = await checker.getDmarcRecord({
-			target: 'mehmet.kozan@gmail.com',
+			target: 'cnn.com',
 		});
 		expect(result).not.toBeNull();
 		expect(result).toHaveProperty('raw');

@@ -1,8 +1,12 @@
+import type { CheckResult } from '../check-results/check-result.js';
 import { TXTRecord, TXTRecordKind } from './txt-record.js';
 
 export const KV_REGEX = /^([^=]+)=(.+)$/;
 
 export class KVRecord extends TXTRecord {
+	public check(): Promise<CheckResult> {
+		throw new Error('Method not implemented.');
+	}
 	key?: string;
 	value?: string;
 

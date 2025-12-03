@@ -1,5 +1,7 @@
 import forge from 'node-forge';
+import { BimiCheckResult, CheckStatus } from '../check-results/index.js';
 import { RootStore } from './bimi-root-store.js';
+import { checkBimiSvg } from './bimi-svg.js';
 import { TXTRecord, TXTRecordKind } from './txt-record.js';
 
 export interface BimiData {
@@ -12,12 +14,15 @@ export interface BimiData {
 }
 
 export class BIMIRecord extends TXTRecord {
+	//Version, Identifies the record retrieved as a BIMI record. It must be the first tag in the record.
 	v?: string;
-	l?: string; // location (logo url)
-	a?: string; // authority (certificate url)
+	// Locations(logo url), Comma separated list of base URLs representing the location of the brand indicator files.
+	l?: string;
+	// Trust Authorities(certificate url), Optional Validation Information for verifying bimi locations.
+	a?: string;
 
-	constructor(raw: string, domain?: string) {
-		super(raw, domain);
+	constructor(raw: string, domain?: string, ns?: Array<string>) {
+		super(raw, domain, ns);
 
 		// Class field initializers run after super(), overwriting values set by parse() called in super().
 		// We must re-parse to restore the values if raw was provided.
@@ -79,42 +84,84 @@ export class BIMIRecord extends TXTRecord {
 		return parts.join('; ');
 	}
 
-	public override async isValid(): Promise<boolean> {
-		if (!(await super.isValid())) return false;
+	public async check(): Promise<BimiCheckResult> {
+		const result = new BimiCheckResult(this.domain, this.ns);
+
+		if (this.kind !== TXTRecordKind.BIMI1) {
+			result.checks[100].status = CheckStatus.Error;
+			return result;
+		}
+		result.checks[100].status = CheckStatus.Ok;
+		result.version = this.v;
+
 		if (!this.v || !this.l) {
 			this.errors.push('BIMI record is missing required fields: version (v) or location (l).');
-			return false;
+			result.checks[150].status = CheckStatus.Error;
+			return result;
+		}
+		result.checks[150].status = CheckStatus.Ok;
+		result.locations = [this.l];
+
+		// Check if location URL ends with .svg
+		try {
+			const url = new URL(this.l);
+			if (!url.pathname.toLowerCase().endsWith('.svg')) {
+				this.errors.push('BIMI location URL must end with .svg extension.');
+				result.checks[160].status = CheckStatus.Error;
+				return result;
+			}
+			result.checks[160].status = CheckStatus.Ok;
+		} catch {
+			this.errors.push('Invalid BIMI location URL.');
+			result.checks[160].status = CheckStatus.Error;
+			return result;
 		}
 
 		const data = await this.downloadBimi();
 		if (data.locationData === null) {
 			this.errors.push(`Failed to download BIMI SVG image from: ${this.l}`);
-			return false;
+			result.checks[200].status = CheckStatus.Error;
+			return result;
 		}
+		result.checks[200].status = CheckStatus.Ok;
 
 		// Validate SVG content
 		if (!data.svgContent?.includes('<svg') || !data.svgContent?.includes('http://www.w3.org/2000/svg')) {
 			this.errors.push('BIMI location does not contain a valid SVG document with the required XML namespace.');
-			return false;
+			result.checks[250].status = CheckStatus.Error;
+			return result;
 		}
 
-		if (this.a && data.authorityData === null) {
-			this.errors.push(`Failed to download BIMI authority evidence (VMC) from: ${this.a}`);
-			return false;
+		const isSVGValid = checkBimiSvg(data.locationData);
+
+		if (isSVGValid) {
+			result.checks[250].status = CheckStatus.Ok;
+		} else {
+			result.checks[250].status = CheckStatus.Error;
 		}
 
-		if (data.authorityData) {
-			return this.validateVmc(data.pemContent);
+		if (this.a) {
+			result.authorities = this.a;
+			if (data.authorityData && data.pemContent) {
+				result.checks[300].status = CheckStatus.Ok;
+				return this.validateVmc(data.pemContent, result);
+			} else {
+				this.errors.push(`Failed to download BIMI authority evidence (VMC) from: ${this.a}`);
+				result.checks[300].status = CheckStatus.Error;
+				return result;
+			}
 		}
 
-		return true;
+		return result;
 	}
 
-	private validateVmc(pemContent: string | undefined): boolean {
-		if (!pemContent?.includes('-----BEGIN CERTIFICATE-----')) {
+	private validateVmc(pemContent: string, result: BimiCheckResult): BimiCheckResult {
+		if (!pemContent.includes('-----BEGIN CERTIFICATE-----')) {
 			this.errors.push('BIMI authority evidence (VMC) is not a valid PEM certificate.');
-			return false;
+			result.checks[350].status = CheckStatus.Error;
+			return result;
 		}
+		result.checks[350].status = CheckStatus.Ok;
 
 		try {
 			// 1. PEM içeriğindeki tüm sertifikaları ayıkla (Zincir: Leaf -> Intermediate -> Root)
@@ -122,36 +169,54 @@ export class BIMIRecord extends TXTRecord {
 
 			if (!pemBlocks || pemBlocks.length === 0) {
 				this.errors.push('No certificates found in PEM content.');
-				return false;
+				result.checks[350].status = CheckStatus.Error;
+				return result;
 			}
 
+			result.checks[400].status = CheckStatus.Ok;
 			const certs = pemBlocks.map((block) => forge.pki.certificateFromPem(block));
 			const leafCert = certs[0]; // İlk sertifika her zaman asıl VMC (Leaf) sertifikasıdır
+
+			result.setCertInfo(certs);
+
+			const vmcExtensionOid = '1.3.6.1.5.5.7.1.12';
+			const vmcExtension = leafCert.extensions.find((ext) => ext.id === vmcExtensionOid);
+			if (!vmcExtension) {
+				result.checks[450].status = CheckStatus.Error;
+				this.errors.push('Certificate is missing the Verified Mark Extension (OID: 1.3.6.1.5.5.7.1.12), so it is not a valid VMC.');
+				return result;
+			}
+
+			const isValidExtension = this.validateLogotypeExtension(vmcExtension.value);
+
+			if (!isValidExtension) {
+				result.checks[450].status = CheckStatus.Error;
+				return result;
+			}
+			result.checks[450].status = CheckStatus.Ok;
 
 			const now = new Date();
 
 			if (now < leafCert.validity.notBefore || now > leafCert.validity.notAfter) {
 				this.errors.push(`BIMI VMC certificate is expired or not yet valid. Valid from: ${leafCert.validity.notBefore} to ${leafCert.validity.notAfter}`);
-				return false;
+				result.checks[500].status = CheckStatus.Error;
+				return result;
 			}
+			result.checks[500].status = CheckStatus.Ok;
 
 			// 2. İmza Doğrulaması (Signature Validation)
 			if (!this.validateChainSignature(certs)) {
-				return false;
+				result.checks[550].status = CheckStatus.Error;
+				return result;
 			}
 
-			const vmcExtensionOid = '1.3.6.1.5.5.7.1.12';
-			const vmcExtension = leafCert.extensions.find((ext) => ext.id === vmcExtensionOid);
+			result.checks[550].status = CheckStatus.Ok;
 
-			if (!vmcExtension) {
-				this.errors.push('Certificate is missing the Verified Mark Extension (OID: 1.3.6.1.5.5.7.1.12), so it is not a valid VMC.');
-				return false;
-			}
-
-			return this.validateLogotypeExtension(vmcExtension.value);
+			return result;
 		} catch (error) {
+			result.checks[400].status = CheckStatus.Error;
 			this.errors.push(`Invalid BIMI VMC certificate: ${(error as Error).message}`);
-			return false;
+			return result;
 		}
 	}
 
@@ -168,28 +233,30 @@ export class BIMIRecord extends TXTRecord {
 		const isChainValid = rootStore.verifyChain(certs);
 
 		if (!isChainValid) {
+			return false;
 			// Eğer tam zincir doğrulaması başarısız olursa (örneğin Root CA eksikse),
 			// en azından dosya içindeki zincirin (Leaf -> Intermediate) tutarlı olup olmadığını kontrol edelim.
 			// Bu, "kısmi" bir doğrulamadır ancak hiç yoktan iyidir.
 
-			if (certs.length >= 2) {
-				const leaf = certs[0];
-				const issuer = certs[1];
-				try {
-					const verified = leaf.verify(issuer);
-					if (verified) {
-						this.errors.push('Warning: The certificate chain is internally consistent, but it does not chain up to a trusted Root CA in our store.');
-						// Tam doğrulama başarısız olduğu için false dönüyoruz, ancak yukarıdaki uyarıyı ekliyoruz.
-						// Eğer "self-contained" zincirleri geçerli saymak isterseniz burayı true yapabilirsiniz.
-						return false;
-					}
-				} catch (e) {
-					// yut, asıl hata aşağıda verilecek
-				}
-			}
+			// if (certs.length >= 2) {
+			// 	const leaf = certs[0];
+			// 	const issuer = certs[2];
+			// 	try {
+			// 		const verified = leaf.verify(issuer);
+			// 		if (verified) {
+			// 			this.errors.push('Warning: The certificate chain is internally consistent, but it does not chain up to a trusted Root CA in our store.');
+			// 			// Tam doğrulama başarısız olduğu için false dönüyoruz, ancak yukarıdaki uyarıyı ekliyoruz.
+			// 			// Eğer "self-contained" zincirleri geçerli saymak isterseniz burayı true yapabilirsiniz.
+			// 			return false;
+			// 		}
+			// 	} catch (e) {
+			// 		debugger;
+			// 		// yut, asıl hata aşağıda verilecek
+			// 	}
+			// }
 
-			this.errors.push('BIMI VMC certificate chain validation failed. The certificate is not trusted by the known Root CAs.');
-			return false;
+			// this.errors.push('BIMI VMC certificate chain validation failed. The certificate is not trusted by the known Root CAs.');
+			// return false;
 		}
 
 		return true;

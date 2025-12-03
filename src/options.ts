@@ -16,7 +16,7 @@ import type { Target } from './address.js';
  * @property {boolean} [useMtaSts=false] - Enable MTA-STS related lookups.
  * @property {boolean} [ignoreIPv6] - Ignore IPv6 addresses when resolving.
  * @property {number} [tries=3] - Number of retry attempts for operations.
- * @property {Array<string[]>} [failoverServers=[['1.1.1.1','1.0.0.1'],['8.8.8.8','8.8.4.4']]] - Fallback DNS resolver groups.
+ * @property {Array<string[]>} [failoverServers=[['1.0.0.1','1.1.1.1'],['8.8.4.4','8.8.8.8']]] - Fallback DNS resolver groups.
  * @property {boolean} [blockLocalIPs=false] - Block local/private IP addresses from results.
  * @property {number} [deliveryPort=25] - Default SMTP delivery port.
  */
@@ -50,7 +50,7 @@ export function setSafeDCOptions(opts?: DomainCheckerOptions): SafeDCOptions {
 	opts.httpTimeout = opts?.httpTimeout ?? 8000;
 	opts.dnsTimeout = opts?.dnsTimeout ?? 5000;
 	opts.tries = opts?.tries ?? 3;
-	opts.useDomainNS = opts?.useDomainNS ?? false;
+	opts.useDomainNS = opts?.useDomainNS ?? true;
 	opts.useMtaSts = opts?.useMtaSts ?? false;
 	opts.failoverServers = opts?.failoverServers ?? [
 		['1.1.1.1', '1.0.0.1'],

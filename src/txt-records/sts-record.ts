@@ -1,6 +1,10 @@
+import type { CheckResult } from '../check-results/check-result.js';
 import { TXTRecord, TXTRecordKind } from './txt-record.js';
 
 export class STSRecord extends TXTRecord {
+	public check(): Promise<CheckResult> {
+		throw new Error('Method not implemented.');
+	}
 	v = 'STSv1';
 	id = '';
 

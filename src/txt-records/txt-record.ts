@@ -1,3 +1,5 @@
+import type { CheckResult } from '../check-results/index.js';
+
 export enum TXTRecordKind {
 	None = 0,
 	Custom = 1,
@@ -12,6 +14,7 @@ export enum TXTRecordKind {
 
 export abstract class TXTRecord {
 	public domain?: string;
+	public ns?: Array<string>;
 	public raw: string;
 	public errors: string[] = [];
 	public kind: TXTRecordKind;
@@ -20,12 +23,13 @@ export abstract class TXTRecord {
 	// biome-ignore lint/suspicious/noExplicitAny: <base record type>
 	[key: string]: any;
 
-	protected knownKeys: string[] = ['domain', 'raw', 'errors', 'kind', 'knownKeys'];
+	protected knownKeys: string[] = ['domain', 'raw', 'errors', 'kind', 'knownKeys', 'ns'];
 
-	constructor(raw: string, domain?: string) {
+	constructor(raw: string, domain?: string, ns?: Array<string>) {
 		this.domain = domain;
 		this.raw = raw;
 		this.kind = TXTRecordKind.None;
+		this.ns = ns;
 	}
 
 	/**
@@ -40,11 +44,8 @@ export abstract class TXTRecord {
 
 	/**
 	 * Checks if the record is valid (basic check).
-	 * Subclasses can override this.
 	 */
-	public async isValid(): Promise<boolean> {
-		return this.errors.length === 0 && this.kind !== TXTRecordKind.None;
-	}
+	public abstract check(): Promise<CheckResult>;
 
 	protected async downloadText(url?: string, timeout: number = 8000): Promise<string | null> {
 		if (!url) return null;

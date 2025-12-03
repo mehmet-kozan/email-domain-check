@@ -1,6 +1,10 @@
+import type { CheckResult } from '../check-results/check-result.js';
 import { TXTRecord, TXTRecordKind } from './txt-record.js';
 
 export class CustomRecord extends TXTRecord {
+	public check(): Promise<CheckResult> {
+		throw new Error('Method not implemented.');
+	}
 	value?: string;
 
 	constructor(raw: string, domain?: string) {

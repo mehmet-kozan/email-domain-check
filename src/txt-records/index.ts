@@ -12,12 +12,14 @@ export { BIMIRecord, KVRecord, CustomRecord, DKIMRecord, SPFRecord, STSRecord, T
 
 export class TXTQueryResult {
 	domain?: string;
+	ns?: string[];
 	rawRecords: string[];
 	dnsRecords: TXTRecord[] = [];
 	public errors: string[] = [];
 
-	constructor(chunks: string[][], domain?: string) {
+	constructor(chunks: string[][], domain?: string, ns?: string[]) {
 		this.domain = domain;
+		this.ns = ns;
 		this.rawRecords = chunks.flat();
 		this.parse(this.rawRecords);
 		this.check();
@@ -137,7 +139,7 @@ export class TXTQueryResult {
 
 			// Check for BIMI record
 			if (upperRecord.startsWith('V=BIMI')) {
-				const record = new BIMIRecord(rawRecord, this.domain);
+				const record = new BIMIRecord(rawRecord, this.domain, this.ns);
 				this.dnsRecords.push(record);
 				continue;
 			}

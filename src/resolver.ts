@@ -27,6 +27,8 @@ export class DNSResolver extends dns.Resolver {
 
 		if (options?.nsHosts) {
 			this.nsHosts = options.nsHosts;
+		} else {
+			this.nsHosts = this.getServers();
 		}
 	}
 }

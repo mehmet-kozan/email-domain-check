@@ -1,6 +1,10 @@
+import type { CheckResult } from '../check-results/check-result.js';
 import { TXTRecord, TXTRecordKind } from './txt-record.js';
 
 export class DKIMRecord extends TXTRecord {
+	public check(): Promise<CheckResult> {
+		throw new Error('Method not implemented.');
+	}
 	v?: string;
 	k?: string;
 	p?: string;

@@ -424,6 +424,21 @@ export class DomainChecker {
 		return null;
 	}
 
+	public async bimiCheck(resolveOptions: ResolveOptions): Promise<BIMIRecord | null> {
+		const addr = Address.loadFromTarget(resolveOptions.target);
+		const bimiAddr = this.get_bimi_addr(addr, resolveOptions.bimiSelector);
+
+		if (bimiAddr) {
+			const opts = { ...resolveOptions };
+			opts.target = bimiAddr;
+			const result = await this.getTxtRecord(opts);
+			const record = result?.getBimiRecord() ?? null;
+			return record;
+		}
+
+		return null;
+	}
+
 	// RFC 8460
 	private get_tls_rpt_addr(addr: Address): Address | null {
 		if (addr.ipKind === IPKind.None && addr.hostname) {
@@ -482,7 +497,7 @@ export class DomainChecker {
 			resolver = await this.getNsResolver(resolveOptions.target);
 		}
 		const txtRecords = await resolver.resolveTxt(resolveOptions.target.hostname);
-		const result = new TXTQueryResult(txtRecords, resolveOptions.target.hostname);
+		const result = new TXTQueryResult(txtRecords, resolveOptions.target.hostname, resolver.nsHosts);
 
 		return result;
 	}

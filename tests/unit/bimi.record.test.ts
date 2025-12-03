@@ -12,9 +12,9 @@ describe('validate bimi record', () => {
 		expect(result).toHaveProperty('raw');
 		expect(typeof result?.raw).toBe('string');
 
-		const res = await result?.isValid();
+		const checkResult = await result?.check();
 
-		expect(res).toBe(true);
+		expect(checkResult?.isValid()).toBe(true);
 	});
 
 	it('cnn.com', async () => {
@@ -25,9 +25,9 @@ describe('validate bimi record', () => {
 		expect(result).toHaveProperty('raw');
 		expect(typeof result?.raw).toBe('string');
 
-		const res = await result?.isValid();
+		const checkResult = await result?.check();
 
-		expect(res).toBe(true);
+		expect(checkResult?.isValid()).toBe(true);
 	});
 
 	it('linkedin.com', async () => {
@@ -38,9 +38,9 @@ describe('validate bimi record', () => {
 		expect(result).toHaveProperty('raw');
 		expect(typeof result?.raw).toBe('string');
 
-		const res = await result?.isValid();
+		const checkResult = await result?.check();
 
-		expect(res).toBe(true);
+		expect(checkResult?.isValid()).toBe(true);
 	});
 
 	it('airbnb.com', async () => {
@@ -51,9 +51,9 @@ describe('validate bimi record', () => {
 		expect(result).toHaveProperty('raw');
 		expect(typeof result?.raw).toBe('string');
 
-		const res = await result?.isValid();
+		const checkResult = await result?.check();
 
-		expect(res).toBe(true);
+		expect(checkResult?.isValid()).toBe(true);
 	});
 
 	it('bankofamerica.com', async () => {
@@ -64,9 +64,9 @@ describe('validate bimi record', () => {
 		expect(result).toHaveProperty('raw');
 		expect(typeof result?.raw).toBe('string');
 
-		const res = await result?.isValid();
+		const checkResult = await result?.check();
 
-		expect(res).toBe(true);
+		expect(checkResult?.isValid()).toBe(true);
 	});
 
 	it('groupon.com', async () => {
@@ -77,9 +77,9 @@ describe('validate bimi record', () => {
 		expect(result).toHaveProperty('raw');
 		expect(typeof result?.raw).toBe('string');
 
-		const res = await result?.isValid();
+		const checkResult = await result?.check();
 
-		expect(res).toBe(true);
+		expect(checkResult?.isValid()).toBe(true);
 	});
 
 	it('chase.com', async () => {
@@ -90,9 +90,9 @@ describe('validate bimi record', () => {
 		expect(result).toHaveProperty('raw');
 		expect(typeof result?.raw).toBe('string');
 
-		const res = await result?.isValid();
+		const checkResult = await result?.check();
 
-		expect(res).toBe(true);
+		expect(checkResult?.isValid()).toBe(true);
 	});
 
 	it('paypal.com', async () => {
@@ -103,8 +103,8 @@ describe('validate bimi record', () => {
 		expect(result).toHaveProperty('raw');
 		expect(typeof result?.raw).toBe('string');
 
-		const res = await result?.isValid();
+		const checkResult = await result?.check();
 
-		expect(res).toBe(true);
+		expect(checkResult?.isValid()).toBe(true);
 	});
 });
