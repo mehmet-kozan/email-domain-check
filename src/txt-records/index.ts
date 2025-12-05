@@ -15,7 +15,6 @@ export class TXTQueryResult {
 	ns?: string[];
 	rawRecords: string[];
 	dnsRecords: TXTRecord[] = [];
-	public errors: string[] = [];
 
 	constructor(chunks: string[][], domain?: string, ns?: string[]) {
 		this.domain = domain;
@@ -26,24 +25,33 @@ export class TXTQueryResult {
 	}
 
 	private check() {
-		this.validateSingleRecord(SPFRecord, 'SPF');
-		this.validateSingleRecord(DMARCRecord, 'DMARC');
-		this.validateSingleRecord(STSRecord, 'MTA-STS');
-		this.validateSingleRecord(BIMIRecord, 'BIMI');
-		this.validateSingleRecord(TLSRPTRecord, 'TLS-RPT');
-		this.validateSingleRecord(DKIMRecord, 'DKIM');
+		//Multiple records found. Only one is allowed.
+		this.validateSingleRecord();
 		this.validateSingleKVRecord();
 	}
 
-	// biome-ignore lint/suspicious/noExplicitAny: Generic constructor type
-	private validateSingleRecord(recordClass: new (...args: any[]) => TXTRecord, name: string) {
-		const records: TXTRecord[] = this.dnsRecords.filter((r) => r instanceof recordClass);
-		if (records.length > 1) {
-			const error = `Multiple ${name} records found. Only one is allowed.`;
-			this.errors.push(error);
+	private validateSingleRecord() {
+		const keyCounts = new Map<string, number>();
+		for (const record of this.dnsRecords) {
+			record.allRecords = this.dnsRecords;
+			if (record instanceof KVRecord) continue;
+			if (record instanceof CustomRecord) continue;
 
-			for (const record of records) {
-				record.errors.push(error);
+			// Use the constructor name (e.g., 'SPFRecord', 'DMARCRecord') as the key
+			// or use a specific property if you want to group by content.
+			// To get the string representation: record.toString() or record.raw
+			const key = record.constructor.name;
+			keyCounts.set(key, (keyCounts.get(key) || 0) + 1);
+		}
+
+		// Logic to mark multiples as errors
+		for (const [key, count] of keyCounts) {
+			if (count > 1) {
+				for (const record of this.dnsRecords) {
+					if (record.constructor.name === key) {
+						record.isMultiple = true;
+					}
+				}
 			}
 		}
 	}
@@ -61,20 +69,13 @@ export class TXTQueryResult {
 
 		for (const [key, count] of keyCounts) {
 			if (count > 1) {
-				const error = `Multiple records found for key '${key}'. Only one is allowed.`;
-				this.errors.push(error);
-
 				for (const record of records) {
 					if (record.key === key) {
-						record.errors.push(error);
+						record.isMultiple = true;
 					}
 				}
 			}
 		}
-	}
-
-	public isValid(): boolean {
-		return this.errors.length === 0;
 	}
 
 	public getCustomRecords(): CustomRecord[] | null {
@@ -92,35 +93,34 @@ export class TXTQueryResult {
 		return result?.length > 0 ? result : null;
 	}
 
-	// Generic helper to reduce code duplication
-	// biome-ignore lint/suspicious/noExplicitAny: Generic constructor type
-	private getRecord<T extends TXTRecord>(type: new (...args: any[]) => T): T | null {
-		const records = this.dnsRecords.filter((r) => r instanceof type) as T[];
+	public getSpfRecord(): SPFRecord | null {
+		const records = this.dnsRecords.filter((r) => r instanceof SPFRecord) as SPFRecord[];
 		return records.length > 0 ? records[records.length - 1] : null;
 	}
 
-	public getSpfRecord(): SPFRecord | null {
-		return this.getRecord(SPFRecord);
-	}
-
 	public getDkimRecord(): DKIMRecord | null {
-		return this.getRecord(DKIMRecord);
+		const records = this.dnsRecords.filter((r) => r instanceof DKIMRecord) as DKIMRecord[];
+		return records.length > 0 ? records[records.length - 1] : null;
 	}
 
 	public getDmarcRecord(): DMARCRecord | null {
-		return this.getRecord(DMARCRecord);
+		const records = this.dnsRecords.filter((r) => r instanceof DMARCRecord) as DMARCRecord[];
+		return records.length > 0 ? records[records.length - 1] : null;
 	}
 
 	public getStsRecord(): STSRecord | null {
-		return this.getRecord(STSRecord);
+		const records = this.dnsRecords.filter((r) => r instanceof STSRecord) as STSRecord[];
+		return records.length > 0 ? records[records.length - 1] : null;
 	}
 
 	public getBimiRecord(): BIMIRecord | null {
-		return this.getRecord(BIMIRecord);
+		const records = this.dnsRecords.filter((r) => r instanceof BIMIRecord) as BIMIRecord[];
+		return records.length > 0 ? records[records.length - 1] : null;
 	}
 
 	public getTLSRPTRecord(): TLSRPTRecord | null {
-		return this.getRecord(TLSRPTRecord);
+		const records = this.dnsRecords.filter((r) => r instanceof TLSRPTRecord) as TLSRPTRecord[];
+		return records.length > 0 ? records[records.length - 1] : null;
 	}
 
 	public parse(rawRecords: string[]): void {

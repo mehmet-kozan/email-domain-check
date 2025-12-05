@@ -16,14 +16,15 @@ export abstract class TXTRecord {
 	public domain?: string;
 	public ns?: Array<string>;
 	public raw: string;
-	public errors: string[] = [];
 	public kind: TXTRecordKind;
+	public isMultiple: boolean = false;
+	public allRecords: TXTRecord[] = [];
 
 	// Index signature to allow dynamic properties (tags) and methods
 	// biome-ignore lint/suspicious/noExplicitAny: <base record type>
 	[key: string]: any;
 
-	protected knownKeys: string[] = ['domain', 'raw', 'errors', 'kind', 'knownKeys', 'ns'];
+	protected knownKeys: string[] = ['domain', 'raw', 'errors', 'kind', 'knownKeys', 'ns', 'isMultiple', 'allRecords'];
 
 	constructor(raw: string, domain?: string, ns?: Array<string>) {
 		this.domain = domain;

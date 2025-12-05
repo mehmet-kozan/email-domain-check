@@ -29,6 +29,7 @@ export abstract class CheckResult {
 	public abstract checks: Record<number, CheckTest>;
 	public ns?: Array<string>;
 	public checkDate: Date;
+	public logs: string[] = [];
 
 	constructor(domain?: string, ns?: Array<string>) {
 		this.domain = domain;

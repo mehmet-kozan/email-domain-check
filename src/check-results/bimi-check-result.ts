@@ -1,8 +1,5 @@
 import forge from 'node-forge';
-import type { DNSResolver } from '../resolver.js';
 import { type CertInfo, CheckResult, CheckStatus } from './check-result.js';
-
-// https://mxtoolbox.com/SuperTool.aspx?action=bimi%3apinterest.com&run=toolpage#
 
 export class BimiCheckResult extends CheckResult {
 	version?: string;
@@ -105,7 +102,7 @@ export class BimiCheckResult extends CheckResult {
 		},
 	};
 
-	public setCertInfo(certs: forge.pki.Certificate[]) {
+	public setCertInfo(certs: forge.pki.Certificate[]): CertInfo {
 		const leaf = certs[0];
 
 		let maxValidFrom = leaf.validity.notBefore;
@@ -128,6 +125,8 @@ export class BimiCheckResult extends CheckResult {
 			serial: leaf.serialNumber,
 			algorithm: forge.pki.oids[leaf.signatureOid] || leaf.signatureOid,
 		};
+
+		return this.certInfo;
 	}
 
 	public isValid(): boolean {

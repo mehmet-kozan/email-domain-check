@@ -50,8 +50,9 @@ export function setSafeDCOptions(opts?: DomainCheckerOptions): SafeDCOptions {
 	opts.httpTimeout = opts?.httpTimeout ?? 8000;
 	opts.dnsTimeout = opts?.dnsTimeout ?? 5000;
 	opts.tries = opts?.tries ?? 3;
-	opts.useDomainNS = opts?.useDomainNS ?? true;
+	opts.useDomainNS = opts?.useDomainNS ?? false;
 	opts.useMtaSts = opts?.useMtaSts ?? false;
+	opts.server = ['1.1.1.1', '1.0.0.1'];
 	opts.failoverServers = opts?.failoverServers ?? [
 		['1.1.1.1', '1.0.0.1'],
 		['8.8.8.8', '8.8.4.4'],

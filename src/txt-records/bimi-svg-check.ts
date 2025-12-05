@@ -39,6 +39,11 @@ export function checkBimiSvg(data: Buffer<ArrayBuffer>): boolean {
 		return false;
 	}
 
+	// Check for XML Namespace
+	if (svg['@_xmlns'] !== 'http://www.w3.org/2000/svg') {
+		return false;
+	}
+
 	// Profile and Version:
 	// version="1.2" is required.
 	if (svg['@_version'] !== '1.2') {
