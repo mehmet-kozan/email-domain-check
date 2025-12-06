@@ -153,7 +153,7 @@ export class DomainChecker {
 			}
 
 			// Fetch policy file
-			const policy = await getMtaStsPolicy(resolveOptions.target);
+			const policy = await getMtaStsPolicy(resolveOptions.target, this.options.httpTimeout);
 
 			if (!policy) {
 				// Policy file not found or invalid
@@ -250,7 +250,7 @@ export class DomainChecker {
 		const addr = Address.loadFromTarget(target);
 
 		// Get MX records
-		const mxRecords = await this.getMxRecord({
+		let mxRecords = await this.getMxRecord({
 			target: addr,
 			useCache: false,
 			preferDomainNS: false,
@@ -262,8 +262,8 @@ export class DomainChecker {
 
 		// Check for local IPs if blocking is enabled
 		if (this.options.blockLocalIPs) {
-			const mxAddr = new Address(mxRecords[0].exchange);
-			if (mxAddr.isLocal) {
+			mxRecords = await this.filterLocalMxRecords(mxRecords);
+			if (mxRecords.length === 0) {
 				throw new Error('Local IP addresses are blocked');
 			}
 		}
@@ -282,6 +282,50 @@ export class DomainChecker {
 		}
 
 		throw lastError || new Error('Failed to connect to any MX server');
+	}
+
+	private async resolveAddresses(host: string): Promise<string[]> {
+		const addresses: string[] = [];
+
+		try {
+			const v4 = await this.resolver.resolve4(host);
+			addresses.push(...v4);
+		} catch {
+			/* ignore */
+		}
+
+		if (!this.options.ignoreIPv6) {
+			try {
+				const v6 = await this.resolver.resolve6(host);
+				addresses.push(...v6);
+			} catch {
+				/* ignore */
+			}
+		}
+
+		return addresses;
+	}
+
+	private async filterLocalMxRecords(records: MxRecord[]): Promise<MxRecord[]> {
+		const filtered: MxRecord[] = [];
+
+		for (const record of records) {
+			const mxAddr = new Address(record.exchange);
+			if (mxAddr.isLocal) {
+				continue;
+			}
+
+			const resolvedAddresses = await this.resolveAddresses(record.exchange);
+			const hasLocal = resolvedAddresses.some((ip) => new Address(ip).isLocal);
+
+			if (hasLocal) {
+				continue;
+			}
+
+			filtered.push(record);
+		}
+
+		return filtered;
 	}
 
 	private connectToSmtp(host: string, port: number): Promise<ReturnType<typeof createConnection>> {
