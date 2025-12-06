@@ -19,6 +19,7 @@ export abstract class TXTRecord {
 	public kind: TXTRecordKind;
 	public isMultiple: boolean = false;
 	public allRecords: TXTRecord[] = [];
+	public errors: string[] = [];
 
 	// Index signature to allow dynamic properties (tags) and methods
 	// biome-ignore lint/suspicious/noExplicitAny: <base record type>

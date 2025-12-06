@@ -7,7 +7,7 @@ export interface MtaStsPolicy {
 	max_age: number;
 }
 
-export async function getMtaStsPolicy(target: Target): Promise<MtaStsPolicy | null> {
+export async function getMtaStsPolicy(target: Target, timeoutMs: number = 8000): Promise<MtaStsPolicy | null> {
 	const addr = Address.loadFromTarget(target);
 
 	if (addr.ipKind !== IPKind.None) {
@@ -21,7 +21,7 @@ export async function getMtaStsPolicy(target: Target): Promise<MtaStsPolicy | nu
 			headers: {
 				'User-Agent': 'email-domain-check',
 			},
-			signal: AbortSignal.timeout(8000),
+			signal: AbortSignal.timeout(timeoutMs),
 		});
 
 		if (!response.ok) {

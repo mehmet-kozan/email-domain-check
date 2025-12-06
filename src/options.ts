@@ -52,13 +52,14 @@ export function setSafeDCOptions(opts?: DomainCheckerOptions): SafeDCOptions {
 	opts.tries = opts?.tries ?? 3;
 	opts.useDomainNS = opts?.useDomainNS ?? false;
 	opts.useMtaSts = opts?.useMtaSts ?? false;
-	opts.server = ['1.1.1.1', '1.0.0.1'];
-	opts.failoverServers = opts?.failoverServers ?? [
+	opts.server = opts.server ?? ['1.1.1.1', '1.0.0.1'];
+	opts.failoverServers = opts.failoverServers ?? [
 		['1.1.1.1', '1.0.0.1'],
 		['8.8.8.8', '8.8.4.4'],
 	];
 	opts.blockLocalIPs = opts?.blockLocalIPs ?? false;
 	opts.deliveryPort = opts?.deliveryPort ?? 25;
+	opts.ignoreIPv6 = opts?.ignoreIPv6 ?? false;
 
 	return opts as SafeDCOptions;
 }
