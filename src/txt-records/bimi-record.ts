@@ -1,3 +1,4 @@
+import dns from 'node:dns/promises';
 import { BimiCheckResult, CheckStatus } from '../check-results/index.js';
 import { checkBimiCert } from './bimi-cert-check.js';
 import { checkBimiSvg } from './bimi-svg-check.js';
@@ -101,6 +102,8 @@ export class BIMIRecord extends TXTRecord {
 		result.checks[150].status = CheckStatus.Ok;
 		result.locations = [this.l];
 
+		await this.checkDmarcRequirement(result);
+
 		// Check if location URL ends with .svg
 		try {
 			const url = new URL(this.l);
@@ -136,6 +139,7 @@ export class BIMIRecord extends TXTRecord {
 			result.authorities = this.a;
 			if (data.authorityData && data.pemContent) {
 				result.checks[300].status = CheckStatus.Ok;
+				result.checks[350].status = CheckStatus.Ok;
 
 				checkBimiCert(data.pemContent, result);
 				return result;
@@ -143,9 +147,18 @@ export class BIMIRecord extends TXTRecord {
 			} else {
 				result.logs.push(`Failed to download BIMI authority evidence (VMC) from: ${this.a}`);
 				result.checks[300].status = CheckStatus.Error;
+				result.checks[350].status = CheckStatus.Error;
 				return result;
 			}
 		}
+
+		// No authority provided: mark certificate-related checks as warnings
+		result.checks[300].status = CheckStatus.Warn;
+		result.checks[350].status = CheckStatus.Warn;
+		result.checks[400].status = CheckStatus.Warn;
+		result.checks[450].status = CheckStatus.Warn;
+		result.checks[500].status = CheckStatus.Warn;
+		result.checks[550].status = CheckStatus.Warn;
 
 		return result;
 	}
@@ -167,5 +180,69 @@ export class BIMIRecord extends TXTRecord {
 		}
 
 		return result;
+	}
+
+	private async checkDmarcRequirement(result: BimiCheckResult): Promise<void> {
+		const baseDomain = this.getBaseDomainForDmarc();
+		if (!baseDomain) {
+			result.logs.push('Unable to derive organizational domain for DMARC lookup.');
+			result.checks[800].status = CheckStatus.Error;
+			result.checks[850].status = CheckStatus.Error;
+			return;
+		}
+
+		const dmarcHost = `_dmarc.${baseDomain}`;
+
+		try {
+			const records = await dns.resolveTxt(dmarcHost);
+			const flattened = records.map((record) => record.join('').trim().toUpperCase());
+			const dmarcRecord = flattened.find((record) => record.startsWith('V=DMARC1'));
+
+			if (!dmarcRecord) {
+				result.checks[800].status = CheckStatus.Error;
+				result.checks[850].status = CheckStatus.Error;
+				result.logs.push(`DMARC record not found at ${dmarcHost}`);
+				return;
+			}
+
+			result.checks[800].status = CheckStatus.Ok;
+
+			const policyTag = dmarcRecord
+				.split(';')
+				.map((part) => part.trim())
+				.find((part) => part.startsWith('P='));
+
+			if (policyTag) {
+				const policyValue = policyTag.split('=')[1]?.toLowerCase();
+				if (policyValue === 'quarantine' || policyValue === 'reject') {
+					result.checks[850].status = CheckStatus.Ok;
+				} else {
+					result.checks[850].status = CheckStatus.Error;
+					result.logs.push(`DMARC policy is not strict enough for BIMI: ${policyValue ?? 'unknown'}`);
+				}
+			} else {
+				result.checks[850].status = CheckStatus.Error;
+				result.logs.push('DMARC policy tag (p=) missing.');
+			}
+		} catch (error) {
+			result.checks[800].status = CheckStatus.Warn;
+			result.checks[850].status = CheckStatus.Warn;
+			result.logs.push(`DMARC lookup failed for ${dmarcHost}: ${(error as Error).message}`);
+		}
+	}
+
+	private getBaseDomainForDmarc(): string | null {
+		if (!this.domain) return null;
+
+		const marker = '._bimi.';
+		const lowerDomain = this.domain.toLowerCase();
+		const markerIndex = lowerDomain.indexOf(marker);
+
+		if (markerIndex === -1) {
+			return this.domain;
+		}
+
+		const base = this.domain.slice(markerIndex + marker.length);
+		return base || null;
 	}
 }
