@@ -19,8 +19,9 @@ export class TXTQueryResult {
 	constructor(chunks: string[][], domain?: string, ns?: string[]) {
 		this.domain = domain;
 		this.ns = ns;
-		this.rawRecords = chunks.flat();
-		this.parse(this.rawRecords);
+		const joinedRecords = chunks.map((chunk) => chunk.join(''));
+		this.rawRecords = joinedRecords;
+		this.parse(joinedRecords);
 		this.check();
 	}
 
